@@ -17,18 +17,67 @@ fn main() -> anyhow::Result<()> {
         .build();
     let mut audio = RaylibAudio::init_audio_device()?;
 
-    let note_a = signal::create_sinusoid(440.0, 0f32, Duration::from_millis(100));
+    let total_dur = Duration::from_millis(100);
+    let note_a = signal::create_sinusoid(440.0, 0f32, total_dur);
 
-    let view_offset = (Duration::from_millis(0).as_secs_f32() * signal::SR as f32) as usize;
-    let view_size = (Duration::from_millis(10).as_secs_f32() * signal::SR as f32) as usize;
-
-    let view = &note_a[view_offset..view_offset + view_size];
+    let mut view_dur = Duration::from_millis(10).as_secs_f32();
+    let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();
 
     while !rl.window_should_close() {
+        let view_offset = (view_offset_dur * signal::SR as f32) as usize;
+        let view_size = (view_dur * signal::SR as f32) as usize;
+        let full_view = &note_a;
+        let view = &full_view[view_offset..view_offset + view_size];
         let mut d = rl.begin_drawing(&thread);
-
         d.clear_background(Color::BLACK);
         draw_block_audio_out(&mut audio, &mut d);
+
+        // overview
+        let overview_w = (W as f32) - 20f32;
+        let overview_rec = Rectangle {
+            x: 10f32,
+            y: 10f32,
+            width: overview_w,
+            height: 100f32,
+        };
+        draw_wave_box(&mut d, overview_rec, &full_view);
+
+        let view_select_rec = Rectangle {
+            height: 100f32,
+            x: 10f32 + overview_w * (view_offset as f32 / full_view.len() as f32),
+            y: 10f32,
+            width: overview_w * (view.len() as f32 / full_view.len() as f32),
+        };
+
+        let mut view_select_color = Color::WHITE.alpha(0.2);
+        if view_select_rec.check_collision_point_rec(d.get_mouse_position()) {
+            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_POINTING_HAND);
+
+            view_select_color = Color::WHITE.alpha(0.3);
+
+            let wheel = d.get_mouse_wheel_move();
+            if wheel != 0f32 {
+                view_dur += wheel * 0.001f32;
+            }
+        } else {
+            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_DEFAULT);
+        }
+
+        if overview_rec.check_collision_point_rec(d.get_mouse_position()) {
+            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_POINTING_HAND);
+            if d.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
+                let x_rel = (d.get_mouse_position().x - overview_rec.x) / overview_rec.width;
+                view_offset_dur = total_dur.as_secs_f32() * x_rel;
+            }
+        } else {
+            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_DEFAULT);
+        }
+
+        view_dur = view_dur
+            .min(total_dur.as_secs_f32() - view_offset_dur)
+            .max(Duration::from_millis(1).as_secs_f32());
+
+        d.draw_rectangle_rec(view_select_rec, view_select_color);
 
         draw_wave_box(
             &mut d,
@@ -45,8 +94,9 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
-    let step = (wave_in.len() as f64 / 50 as f64).ceil() as usize;
-    let wave: Vec<f32> = wave_in.iter().step_by(step).take(50).cloned().collect();
+    let n = (rec.width as usize * 100) / 200;
+    let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
+    let wave: Vec<f32> = wave_in.iter().step_by(step).take(n).cloned().collect();
     let n_samples = wave.len();
     let max = wave
         .iter()
