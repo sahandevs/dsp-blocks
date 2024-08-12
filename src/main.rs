@@ -1,14 +1,28 @@
 #![allow(non_upper_case_globals)]
 
+use std::time::Duration;
+
 use raylib::prelude::*;
+pub mod signal;
 
 const W: i32 = 1080;
 const H: i32 = 720;
 const T: f32 = 3f32;
 
 fn main() -> anyhow::Result<()> {
-    let (mut rl, thread) = raylib::init().size(W, H).title("DSP Blocks").build();
+    let (mut rl, thread) = raylib::init()
+        .msaa_4x()
+        .size(W, H)
+        .title("DSP Blocks")
+        .build();
     let mut audio = RaylibAudio::init_audio_device()?;
+
+    let note_a = signal::create_sinusoid(440.0, 0f32, Duration::from_millis(100));
+
+    let view_offset = (Duration::from_millis(0).as_secs_f32() * signal::SR as f32) as usize;
+    let view_size = (Duration::from_millis(10).as_secs_f32() * signal::SR as f32) as usize;
+
+    let view = &note_a[view_offset..view_offset + view_size];
 
     while !rl.window_should_close() {
         let mut d = rl.begin_drawing(&thread);
@@ -20,17 +34,19 @@ fn main() -> anyhow::Result<()> {
             &mut d,
             Rectangle {
                 x: 50f32,
-                y: 100f32,
+                y: 300f32,
                 height: 100f32,
                 width: 200f32,
             },
-            &[],
+            &view,
         );
     }
     Ok(())
 }
 
-fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave: &[f32]) {
+fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
+    let step = (wave_in.len() as f64 / 50 as f64).ceil() as usize;
+    let wave: Vec<f32> = wave_in.iter().step_by(step).take(50).cloned().collect();
     let n_samples = wave.len();
     let max = wave
         .iter()
@@ -55,7 +71,7 @@ fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave: &[f32]) {
     let l_w = (5f32 * (T * 1.5 / n_samples as f32)).max(1f32);
     for sample in wave {
         let amp = sample / max;
-        let y = amp * (rec.height / 2.5f32) + center_y;
+        let y = center_y - amp * (rec.height / 2.5f32);
         const COLOR: Color = Color::BLUEVIOLET;
 
         d.draw_line_ex(
