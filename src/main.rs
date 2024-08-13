@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use raylib::prelude::*;
+use rodio::{OutputStream, Sink, Source};
 pub mod signal;
 
 const W: i32 = 1080;
@@ -15,13 +16,22 @@ fn main() -> anyhow::Result<()> {
         .size(W, H)
         .title("DSP Blocks")
         .build();
-    let mut audio = RaylibAudio::init_audio_device()?;
 
     let total_dur = Duration::from_millis(100);
     let note_a = signal::create_sinusoid(440.0, 0f32, total_dur);
 
     let mut view_dur = Duration::from_millis(10).as_secs_f32();
     let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();
+
+    let (_stream, stream_handle) = OutputStream::try_default()?;
+    let sink = Sink::try_new(&stream_handle)?;
+
+    let source =
+        rodio::buffer::SamplesBuffer::new(1, signal::SR as u32, note_a.clone()).repeat_infinite();
+    let total_duration = note_a.len() as f32 / signal::SR as f32;
+    sink.append(source);
+    sink.set_volume(0.2);
+    sink.play();
 
     while !rl.window_should_close() {
         let view_offset = (view_offset_dur * signal::SR as f32) as usize;
@@ -30,7 +40,9 @@ fn main() -> anyhow::Result<()> {
         let view = &full_view[view_offset..view_offset + view_size];
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
-        draw_block_audio_out(&mut audio, &mut d);
+        draw_block_audio_out(&mut d);
+
+        let current_sound_pos = (sink.get_pos().as_secs_f32() / total_duration) % total_duration;
 
         // overview
         let overview_w = (W as f32) - 20f32;
@@ -41,6 +53,19 @@ fn main() -> anyhow::Result<()> {
             height: 100f32,
         };
         draw_wave_box(&mut d, overview_rec, &full_view);
+
+        d.draw_line_ex(
+            Vector2::new(
+                overview_rec.x + current_sound_pos * overview_w,
+                overview_rec.y,
+            ),
+            Vector2::new(
+                overview_rec.x + current_sound_pos * overview_w,
+                overview_rec.y + overview_rec.height,
+            ),
+            1f32,
+            Color::RED,
+        );
 
         let view_select_rec = Rectangle {
             height: 100f32,
@@ -59,8 +84,6 @@ fn main() -> anyhow::Result<()> {
             if wheel != 0f32 {
                 view_dur += wheel * 0.001f32;
             }
-        } else {
-            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_DEFAULT);
         }
 
         if overview_rec.check_collision_point_rec(d.get_mouse_position()) {
@@ -148,7 +171,7 @@ fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
     d.draw_rectangle_lines_ex(rec, T / 1.5f32, Color::WHITE);
 }
 
-fn draw_block_audio_out(_audio: &mut RaylibAudio, d: &mut RaylibDrawHandle) {
+fn draw_block_audio_out(d: &mut RaylibDrawHandle) {
     const h: i32 = 40;
     const p: i32 = 10;
     const w: i32 = 20 + p * 4;
