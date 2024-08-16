@@ -17,8 +17,10 @@ fn main() -> anyhow::Result<()> {
         .title("DSP Blocks")
         .build();
 
-    let total_dur = Duration::from_millis(100);
+    let total_dur = Duration::from_millis(1000);
     let note_a = signal::create_sinusoid(440.0, 0f32, total_dur);
+    let note_b = signal::create_sinusoid(493.0, 0f32, total_dur);
+    let x_t = signal::mix_waves(&note_a, &note_b);
 
     let mut view_dur = Duration::from_millis(10).as_secs_f32();
     let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();
@@ -27,8 +29,8 @@ fn main() -> anyhow::Result<()> {
     let sink = Sink::try_new(&stream_handle)?;
 
     let source =
-        rodio::buffer::SamplesBuffer::new(1, signal::SR as u32, note_a.clone()).repeat_infinite();
-    let total_duration = note_a.len() as f32 / signal::SR as f32;
+        rodio::buffer::SamplesBuffer::new(1, signal::SR as u32, x_t.clone()).repeat_infinite();
+    let total_duration = x_t.len() as f32 / signal::SR as f32;
     sink.append(source);
     sink.set_volume(0.2);
     sink.play();
@@ -36,7 +38,7 @@ fn main() -> anyhow::Result<()> {
     while !rl.window_should_close() {
         let view_offset = (view_offset_dur * signal::SR as f32) as usize;
         let view_size = (view_dur * signal::SR as f32) as usize;
-        let full_view = &note_a;
+        let full_view = &x_t;
         let view = &full_view[view_offset..view_offset + view_size];
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
@@ -117,7 +119,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
-    let n = (rec.width as usize * 100) / 200;
+    let n = (rec.width as usize * rec.width as usize / 2) / 200;
     let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
     let wave: Vec<f32> = wave_in.iter().step_by(step).take(n).cloned().collect();
     let n_samples = wave.len();

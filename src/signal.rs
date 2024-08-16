@@ -1,5 +1,4 @@
 use std::f32::consts::PI;
-
 pub const SR: usize = 44100;
 
 pub type Wave = Vec<f32>;
@@ -14,5 +13,16 @@ pub fn create_sinusoid(freq: f32, phase: f32, duration: std::time::Duration) -> 
         let value = 2.0 * PI * freq * (step * i as f32) + phase;
         wave[i] = value.sin();
     }
+    wave
+}
+
+pub fn mix_waves(a: &Wave, b: &Wave) -> Wave {
+    assert!(a.len() == b.len(), "{} {}", a.len(), b.len());
+
+    let mut wave = vec![0f32; a.len()];
+    for (i, (a, b)) in a.iter().zip(b.iter()).enumerate() {
+        wave[i] = (a + b) / 2f32;
+    }
+
     wave
 }
