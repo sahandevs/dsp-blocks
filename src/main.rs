@@ -119,7 +119,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
-    let n = (rec.width as usize * rec.width as usize / 2) / 200;
+    let n = (rec.width as usize * rec.width as usize) / 200;
     let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
     let wave: Vec<f32> = wave_in.iter().step_by(step).take(n).cloned().collect();
     let n_samples = wave.len();
@@ -144,27 +144,28 @@ fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
     );
     let mut offset = spacing;
     let l_w = (5f32 * (T * 1.5 / n_samples as f32)).max(1f32);
+
+    let get_y = |sample:f32| (center_y - (sample / max) * (rec.height / 2.5f32));
+    let mut last_point = get_y(wave[0]);
     for sample in wave {
-        let amp = sample / max;
-        let y = center_y - amp * (rec.height / 2.5f32);
+        let y = get_y(sample);
         const COLOR: Color = Color::BLUEVIOLET;
 
         d.draw_line_ex(
-            Vector2::new(rec.x + offset, center_y),
+            Vector2::new(rec.x + offset - spacing, last_point),
             Vector2::new(rec.x + offset, y),
             l_w,
             COLOR,
         );
 
-        d.draw_rectangle_rec(
-            Rectangle {
-                x: rec.x + offset - l_w,
-                y,
-                width: l_w * 2f32,
-                height: l_w * 2f32,
-            },
-            COLOR,
-        );
+        last_point = y;
+
+        // d.draw_circle_lines(
+        //     (rec.x + offset - l_w + 2f32) as _,
+        //     y as _,
+        //     2f32,
+        //     COLOR,
+        // );
 
         offset += spacing;
     }
