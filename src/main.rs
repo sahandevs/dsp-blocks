@@ -4,7 +4,8 @@ use std::time::Duration;
 
 use raylib::prelude::*;
 use rodio::{OutputStream, Sink, Source};
-pub mod signal;
+pub mod dsp;
+pub mod graph;
 
 const W: i32 = 1080;
 const H: i32 = 720;
@@ -18,9 +19,13 @@ fn main() -> anyhow::Result<()> {
         .build();
 
     let total_dur = Duration::from_millis(1000);
-    let note_a = signal::create_sinusoid(440.0, 0f32, total_dur);
-    let note_b = signal::create_sinusoid(493.0, 0f32, total_dur);
-    let x_t = signal::mix_waves(&note_a, &note_b);
+    let note_a = dsp::signals::create_sinusoid(440.0, 0f32, total_dur);
+    let note_b = dsp::signals::create_sinusoid(493.0, 0f32, total_dur);
+
+    pub use dsp::systems::*;
+
+    let sterio_sys = SterioSystem.connect(BinaryOpSystem::Mix);
+    let x_t = sterio_sys.process((note_a, note_b));
 
     let mut view_dur = Duration::from_millis(10).as_secs_f32();
     let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();
@@ -29,15 +34,15 @@ fn main() -> anyhow::Result<()> {
     let sink = Sink::try_new(&stream_handle)?;
 
     let source =
-        rodio::buffer::SamplesBuffer::new(1, signal::SR as u32, x_t.clone()).repeat_infinite();
-    let total_duration = x_t.len() as f32 / signal::SR as f32;
+        rodio::buffer::SamplesBuffer::new(1, dsp::SR as u32, x_t.clone()).repeat_infinite();
+    let total_duration = x_t.len() as f32 / dsp::SR as f32;
     sink.append(source);
     sink.set_volume(0.2);
     sink.play();
 
     while !rl.window_should_close() {
-        let view_offset = (view_offset_dur * signal::SR as f32) as usize;
-        let view_size = (view_dur * signal::SR as f32) as usize;
+        let view_offset = (view_offset_dur * dsp::SR as f32) as usize;
+        let view_size = (view_dur * dsp::SR as f32) as usize;
         let full_view = &x_t;
         let view = &full_view[view_offset..view_offset + view_size];
         let mut d = rl.begin_drawing(&thread);
@@ -145,7 +150,7 @@ fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
     let mut offset = spacing;
     let l_w = (5f32 * (T * 1.5 / n_samples as f32)).max(1f32);
 
-    let get_y = |sample:f32| (center_y - (sample / max) * (rec.height / 2.5f32));
+    let get_y = |sample: f32| (center_y - (sample / max) * (rec.height / 2.5f32));
     let mut last_point = get_y(wave[0]);
     for sample in wave {
         let y = get_y(sample);
