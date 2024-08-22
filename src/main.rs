@@ -5,6 +5,7 @@ use std::time::Duration;
 use raylib::prelude::*;
 use rodio::{OutputStream, Sink, Source};
 pub mod dsp;
+pub mod vis;
 
 const W: i32 = 1080;
 const H: i32 = 720;
@@ -18,13 +19,36 @@ fn main() -> anyhow::Result<()> {
         .build();
 
     let total_dur = Duration::from_millis(1000);
-    let note_a = dsp::signals::create_sinusoid(440.0, 0f32, total_dur);
-    let note_b = dsp::signals::create_sinusoid(493.0, 0f32, total_dur);
 
     pub use dsp::blocks::*;
 
-    let mut sterio_sys = Channels.connect(Basic::Mix);
-    let x_t = sterio_sys.process([note_a, note_b]);
+    let mut sterio_sys = blocks::synths::Oscillator
+        .join(blocks::synths::Oscillator)
+        .join(blocks::synths::Oscillator)
+        .connect(Channels)
+        .connect(Basic::Mix);
+    let x_t = sterio_sys.process((
+        (
+            synths::OscillatorControls {
+                duration: total_dur.clone(),
+                freq: 440.0,
+                phase: 0f32,
+                wave: synths::WaveType::Sinusoid,
+            },
+            synths::OscillatorControls {
+                duration: total_dur.clone(),
+                freq: 312.0,
+                phase: 0f32,
+                wave: synths::WaveType::Sinusoid,
+            },
+        ),
+        synths::OscillatorControls {
+            duration: total_dur.clone(),
+            freq: 440.0,
+            phase: 0f32,
+            wave: synths::WaveType::Sinusoid,
+        },
+    ));
 
     let mut view_dur = Duration::from_millis(10).as_secs_f32();
     let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();

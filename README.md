@@ -6,6 +6,8 @@
 
 ### Basic Signal Processing
 
+- [x] Blocks Core
+- [ ] Vis Core
 - [ ] Implement and visualize basic waveforms (sine, square, sawtooth)
 - [ ] Create interactive controls for frequency, amplitude, and phase
 - [ ] Implement signal addition, multiplication, and scaling
@@ -31,7 +33,7 @@
 - [ ] Implement basic reverberation
 - [ ] Create a simple delay effect
 - [ ] Visualize stereo signals
-  
+
 ## Phase 2: Music-Specific DSP and Feature Extraction
 
 ### Music Fundamentals and Low-Level Features
