@@ -21,9 +21,9 @@ fn main() -> anyhow::Result<()> {
     let note_a = dsp::signals::create_sinusoid(440.0, 0f32, total_dur);
     let note_b = dsp::signals::create_sinusoid(493.0, 0f32, total_dur);
 
-    pub use dsp::systems::*;
+    pub use dsp::blocks::*;
 
-    let sterio_sys = Channels.connect(BinaryOp::Mix);
+    let mut sterio_sys = Channels.connect(Basic::Mix);
     let x_t = sterio_sys.process([note_a, note_b]);
 
     let mut view_dur = Duration::from_millis(10).as_secs_f32();

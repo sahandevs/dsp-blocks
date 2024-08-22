@@ -7,7 +7,7 @@ pub trait Block {
     type Input;
     type Output;
 
-    fn process(&self, input: Self::Input) -> Self::Output;
+    fn process(&mut self, input: Self::Input) -> Self::Output;
 }
 
 pub mod signals {
@@ -27,29 +27,29 @@ pub mod signals {
     }
 }
 
-pub mod systems {
-
+pub mod blocks {
     pub use super::*;
 
-    pub enum BinaryOp {
+    pub enum Basic<const N: usize>  {
         Mix,
     }
 
-    impl Block for BinaryOp {
-        type Input = [Wave; 2];
-
+    impl<const N: usize> Block for Basic<N> {
+        type Input = [Wave; N];
         type Output = Wave;
-
-        fn process(&self, [a, b]: Self::Input) -> Self::Output {
+    
+        fn process(&mut self, input: Self::Input) -> Self::Output {
             match self {
-                BinaryOp::Mix => {
-                    assert!(a.len() == b.len(), "{} {}", a.len(), b.len());
-
-                    let mut wave = vec![0f32; a.len()];
-                    for (i, (a, b)) in a.iter().zip(b.iter()).enumerate() {
-                        wave[i] = (a + b) / 2f32;
+                Basic::Mix => {
+                    let len = input[0].len();
+                    assert!(input.iter().all(|wave| wave.len() == len), "All input waves must have the same length");
+    
+                    let mut wave = vec![0f32; len];
+                    for i in 0..len {
+                        let sum: f32 = input.iter().map(|w| w[i]).sum();
+                        wave[i] = sum / N as f32;
                     }
-
+    
                     wave
                 }
             }
@@ -72,7 +72,7 @@ pub mod systems {
 
         type Output = [Wave; N];
 
-        fn process(&self, x: Self::Input) -> Self::Output {
+        fn process(&mut self, x: Self::Input) -> Self::Output {
             x
         }
     }
@@ -91,7 +91,7 @@ pub mod systems {
 
         type Output = O2;
 
-        fn process(&self, input: Self::Input) -> Self::Output {
+        fn process(&mut self, input: Self::Input) -> Self::Output {
             let x = self.input.process(input);
             self.output.process(x)
         }
