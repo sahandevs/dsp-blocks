@@ -3,7 +3,7 @@ pub const SR: usize = 44100;
 
 pub type Wave = Vec<f32>;
 
-pub trait System {
+pub trait Block {
     type Input;
     type Output;
 
@@ -31,18 +31,18 @@ pub mod systems {
 
     pub use super::*;
 
-    pub enum BinaryOpSystem {
+    pub enum BinaryOp {
         Mix,
     }
 
-    impl System for BinaryOpSystem {
-        type Input = (Wave, Wave);
+    impl Block for BinaryOp {
+        type Input = [Wave; 2];
 
         type Output = Wave;
 
-        fn process(&self, (a, b): Self::Input) -> Self::Output {
+        fn process(&self, [a, b]: Self::Input) -> Self::Output {
             match self {
-                BinaryOpSystem::Mix => {
+                BinaryOp::Mix => {
                     assert!(a.len() == b.len(), "{} {}", a.len(), b.len());
 
                     let mut wave = vec![0f32; a.len()];
@@ -56,36 +56,36 @@ pub mod systems {
         }
     }
 
-    pub trait ConnectedSystems {
-        fn connect<I1, OC, O2, S2: System<Input = OC, Output = O2>>(
+    pub trait Join {
+        fn connect<I1, OC, O2, S2: Block<Input = OC, Output = O2>>(
             self,
             other: S2,
-        ) -> impl System<Input = I1, Output = O2>
+        ) -> impl Block<Input = I1, Output = O2>
         where
-            Self: System<Input = I1, Output = OC>;
+            Self: Block<Input = I1, Output = OC>;
     }
 
-    pub struct SterioSystem;
+    pub struct Channels<const N: usize>;
 
-    impl System for SterioSystem {
-        type Input = (Wave, Wave);
+    impl<const N: usize> Block for Channels<N> {
+        type Input = [Wave; N];
 
-        type Output = (Wave, Wave);
+        type Output = [Wave; N];
 
-        fn process(&self, (a, b): Self::Input) -> Self::Output {
-            (a, b)
+        fn process(&self, x: Self::Input) -> Self::Output {
+            x
         }
     }
 
-    pub struct ConnectedSystem<S1, S2> {
+    pub struct JoinedBlocks<S1, S2> {
         input: S1,
         output: S2,
     }
 
-    impl<S1, S2, I1, OC, O2> System for ConnectedSystem<S1, S2>
+    impl<S1, S2, I1, OC, O2> Block for JoinedBlocks<S1, S2>
     where
-        S1: System<Input = I1, Output = OC>,
-        S2: System<Input = OC, Output = O2>,
+        S1: Block<Input = I1, Output = OC>,
+        S2: Block<Input = OC, Output = O2>,
     {
         type Input = I1;
 
@@ -97,15 +97,15 @@ pub mod systems {
         }
     }
 
-    impl<T> ConnectedSystems for T {
-        fn connect<I1, OC, O2, S2: System<Input = OC, Output = O2>>(
+    impl<T> Join for T {
+        fn connect<I1, OC, O2, S2: Block<Input = OC, Output = O2>>(
             self,
             other: S2,
-        ) -> impl System<Input = I1, Output = O2>
+        ) -> impl Block<Input = I1, Output = O2>
         where
-            Self: System<Input = I1, Output = OC>,
+            Self: Block<Input = I1, Output = OC>,
         {
-            ConnectedSystem {
+            JoinedBlocks {
                 input: self,
                 output: other,
             }

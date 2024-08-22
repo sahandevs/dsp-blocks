@@ -5,7 +5,6 @@ use std::time::Duration;
 use raylib::prelude::*;
 use rodio::{OutputStream, Sink, Source};
 pub mod dsp;
-pub mod graph;
 
 const W: i32 = 1080;
 const H: i32 = 720;
@@ -24,8 +23,8 @@ fn main() -> anyhow::Result<()> {
 
     pub use dsp::systems::*;
 
-    let sterio_sys = SterioSystem.connect(BinaryOpSystem::Mix);
-    let x_t = sterio_sys.process((note_a, note_b));
+    let sterio_sys = Channels.connect(BinaryOp::Mix);
+    let x_t = sterio_sys.process([note_a, note_b]);
 
     let mut view_dur = Duration::from_millis(10).as_secs_f32();
     let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();
@@ -40,12 +39,25 @@ fn main() -> anyhow::Result<()> {
     sink.set_volume(0.2);
     sink.play();
 
+    let mut tx = rl.load_render_texture(&thread, 100, 100).unwrap();
+    let mut xxx = 9f32;
     while !rl.window_should_close() {
         let view_offset = (view_offset_dur * dsp::SR as f32) as usize;
         let view_size = (view_dur * dsp::SR as f32) as usize;
         let full_view = &x_t;
         let view = &full_view[view_offset..view_offset + view_size];
+
         let mut d = rl.begin_drawing(&thread);
+        {
+            let mut d = d.begin_texture_mode(&thread, &mut tx);
+            d.clear_background(Color::BLACK);
+            d.draw_circle(50, 50, 5f32, Color::RED);
+            d.draw_circle(50 + xxx as i32, 50, 5f32, Color::RED);
+            xxx += 0.01f32;
+        }
+
+        d.draw_texture(&tx, 150, 150, Color::RED);
+
         d.clear_background(Color::BLACK);
         draw_block_audio_out(&mut d);
 
