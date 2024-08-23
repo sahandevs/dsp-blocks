@@ -61,10 +61,11 @@ pub mod blocks {
         Mix,
     }
 
-    impl<const N: usize> Block<[Wave; N]> for Basic<N> {
+    impl<T: IntoArray<[Wave; N]>, const N: usize> Block<T> for Basic<N> {
         type Output = Wave;
 
-        fn process(&mut self, input: [Wave; N]) -> Self::Output {
+        fn process(&mut self, input: T) -> Self::Output {
+            let input = input.into();
             match self {
                 Basic::Mix => {
                     let len = input[0].len();
@@ -154,16 +155,6 @@ pub mod blocks {
         ) -> impl Block<I1, Output = O2>
         where
             Self: Block<I1, Output = OC>;
-    }
-
-    pub struct Channels<const N: usize>;
-
-    impl<const N: usize, T: IntoArray<[Wave; N]>> Block<T> for Channels<N> {
-        type Output = [Wave; N];
-
-        fn process(&mut self, x: T) -> Self::Output {
-            x.into()
-        }
     }
 
     pub struct ConnectedBlocks<S1, S2> {

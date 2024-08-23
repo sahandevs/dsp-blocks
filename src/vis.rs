@@ -11,6 +11,4 @@ pub trait Vis {
     ) -> Self::Output;
 }
 
-
 // impls
-

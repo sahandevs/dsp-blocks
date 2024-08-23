@@ -25,7 +25,6 @@ fn main() -> anyhow::Result<()> {
     let mut sterio_sys = blocks::synths::Oscillator
         .join(blocks::synths::Oscillator)
         .join(blocks::synths::Oscillator)
-        .connect(Channels)
         .connect(Basic::Mix);
     let x_t = sterio_sys.process((
         (
@@ -38,7 +37,7 @@ fn main() -> anyhow::Result<()> {
             synths::OscillatorControls {
                 duration: total_dur.clone(),
                 freq: 312.0,
-                phase: 0f32,
+                phase: 0.5f32,
                 wave: synths::WaveType::Sinusoid,
             },
         ),
