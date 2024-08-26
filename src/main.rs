@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
         ),
         synths::OscillatorControls {
             duration: total_dur.clone(),
-            freq: 440.0,
+            freq: 73.0,
             phase: 0f32,
             wave: synths::WaveType::Sinusoid,
         },
@@ -84,10 +84,9 @@ fn main() -> anyhow::Result<()> {
             d.draw_texture_rec(
                 &x,
                 Rectangle {
-                    x: 150f32,
-                    y: 150f32,
                     width: x.width() as _,
-                    height: -x.height() as _ ,
+                    height: -x.height() as _,
+                    ..Default::default()
                 },
                 Vector2::new(150f32, 150f32),
                 Color::WHITE,
@@ -157,16 +156,16 @@ fn main() -> anyhow::Result<()> {
 
         d.draw_rectangle_rec(view_select_rec, view_select_color);
 
-        draw_wave_box(
-            &mut d,
-            Rectangle {
-                x: 50f32,
-                y: 300f32,
-                height: 100f32,
-                width: 200f32,
-            },
-            &view,
-        );
+        // draw_wave_box(
+        //     &mut d,
+        //     Rectangle {
+        //         x: 50f32,
+        //         y: 300f32,
+        //         height: 100f32,
+        //         width: 200f32,
+        //     },
+        //     &view,
+        // );
     }
     Ok(())
 }

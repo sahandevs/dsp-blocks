@@ -1,6 +1,12 @@
-use std::f32::consts::PI;
-
+use crate::vis;
 use crate::vis::{DrawContext, VisualizeResult};
+use raylib::texture::RaylibTexture2D;
+use raylib::{color::Color, ffi::BlendMode, math::Vector2, prelude::RaylibBlendModeExt};
+use raylib::{
+    math::Rectangle,
+    prelude::{RaylibDraw, RaylibTextureModeExt},
+};
+use std::f32::consts::PI;
 pub const SR: usize = 44100;
 
 pub type Wave = Vec<f32>;
@@ -39,15 +45,10 @@ pub mod signals {
 }
 
 pub mod blocks {
+
     pub use super::*;
 
     pub mod synths {
-        use raylib::{
-            color::Color,
-            math::Rectangle,
-            prelude::{RaylibBlendModeExt, RaylibDraw, RaylibTextureModeExt},
-            texture::{RaylibRenderTexture2D, RaylibTexture2D},
-        };
 
         use crate::vis;
 
@@ -121,6 +122,7 @@ pub mod blocks {
         }
     }
 
+    #[derive(Debug)]
     pub enum Basic<const N: usize> {
         Mix,
     }
@@ -147,6 +149,36 @@ pub mod blocks {
                     wave
                 }
             }
+        }
+
+        fn process_and_visualize(
+            &mut self,
+            input: T,
+            context: &mut DrawContext,
+        ) -> (Self::Output, VisualizeResult) {
+            let out = self.process(input);
+            let mut tx = context.get_texture(vis::BOX_SIZE as _, vis::BOX_SIZE as _);
+            let mut d = context.rl.begin_drawing(context.thread);
+            let mut d = d.begin_texture_mode(context.thread, &mut tx);
+
+            let h = (vis::BOX_SIZE / 2f32) + vis::T;
+            d.draw_text(
+                &format!("{:?}", self),
+                (vis::T + 2f32) as _,
+                (h + 2f32) as _,
+                1,
+                vis::TEXT_COLOR,
+            );
+            vis::draw_border(
+                &mut d,
+                Rectangle {
+                    height: vis::BOX_SIZE,
+                    width: vis::BOX_SIZE,
+                    ..Default::default()
+                },
+            );
+            drop(d);
+            (out, VisualizeResult::SimpleTexture(tx))
         }
     }
 
@@ -185,7 +217,114 @@ pub mod blocks {
             let (a, a_txt) = self.a.process_and_visualize(input.0, context);
             let (b, b_txt) = self.b.process_and_visualize(input.1, context);
 
-            ((a, b), a_txt)
+            let ((a_texture, a_inputs, a_outputs), (b_texture, b_inputs, b_output)) =
+                match (a_txt, b_txt) {
+                    (VisualizeResult::None, VisualizeResult::None) => {
+                        return ((a, b), VisualizeResult::None)
+                    }
+                    (VisualizeResult::None, VisualizeResult::SimpleTexture(x))
+                    | (VisualizeResult::SimpleTexture(x), VisualizeResult::None) => {
+                        return ((a, b), VisualizeResult::SimpleTexture(x))
+                    }
+                    (
+                        VisualizeResult::None,
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                    )
+                    | (
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                        VisualizeResult::None,
+                    ) => {
+                        return (
+                            (a, b),
+                            VisualizeResult::Block {
+                                texture,
+                                input_connections,
+                                output_connections,
+                            },
+                        )
+                    }
+                    (VisualizeResult::SimpleTexture(a), VisualizeResult::SimpleTexture(b)) => {
+                        ((a, vec![], vec![]), (b, vec![], vec![]))
+                    }
+                    (
+                        VisualizeResult::SimpleTexture(a),
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                    ) => (
+                        (a, vec![], vec![]),
+                        (texture, input_connections, output_connections),
+                    ),
+                    (
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                        VisualizeResult::SimpleTexture(b),
+                    ) => (
+                        (texture, input_connections, output_connections),
+                        (b, vec![], vec![]),
+                    ),
+                    (
+                        VisualizeResult::Block {
+                            texture: a,
+                            input_connections: a_input,
+                            output_connections: a_output,
+                        },
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                    ) => (
+                        (a, a_input, a_output),
+                        (texture, input_connections, output_connections),
+                    ),
+                };
+
+            let max_w = a_texture.width().max(b_texture.width());
+            let max_h = a_texture.height() + b_texture.height();
+
+            let pad = vis::T * 3f32;
+            let mut tx = context.get_texture(max_w as _, (max_h as f32 + pad) as _);
+            let mut d = context.rl.begin_drawing(context.thread);
+            let mut d = d.begin_texture_mode(context.thread, &mut tx);
+            let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
+            db.draw_texture_rec(
+                &a_texture,
+                Rectangle {
+                    width: a_texture.width() as _,
+                    height: -a_texture.height() as _,
+                    ..Default::default()
+                },
+                Vector2::new(0f32, 0f32),
+                Color::WHITE,
+            );
+            db.draw_texture_rec(
+                &b_texture,
+                Rectangle {
+                    width: b_texture.width() as _,
+                    height: -b_texture.height() as _,
+                    ..Default::default()
+                },
+                Vector2::new(0f32, (a_texture.height() as f32 + pad) as f32),
+                Color::WHITE,
+            );
+            drop(db);
+            drop(d);
+
+            ((a, b), VisualizeResult::SimpleTexture(tx))
         }
     }
 
@@ -254,10 +393,120 @@ pub mod blocks {
             input: I1,
             context: &mut DrawContext,
         ) -> (Self::Output, VisualizeResult) {
-            let (x, x_txt) = self.input.process_and_visualize(input, context);
+            let (x, in_txt) = self.input.process_and_visualize(input, context);
             let (out, out_txt) = self.output.process_and_visualize(x, context);
 
-            (out, x_txt)
+            let ((a_texture, a_inputs, a_outputs), (b_texture, b_inputs, b_output)) =
+                match (in_txt, out_txt) {
+                    (VisualizeResult::None, VisualizeResult::None) => {
+                        return ((out), VisualizeResult::None)
+                    }
+                    (VisualizeResult::None, VisualizeResult::SimpleTexture(x))
+                    | (VisualizeResult::SimpleTexture(x), VisualizeResult::None) => {
+                        return ((out), VisualizeResult::SimpleTexture(x))
+                    }
+                    (
+                        VisualizeResult::None,
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                    )
+                    | (
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                        VisualizeResult::None,
+                    ) => {
+                        return (
+                            (out),
+                            VisualizeResult::Block {
+                                texture,
+                                input_connections,
+                                output_connections,
+                            },
+                        )
+                    }
+                    (VisualizeResult::SimpleTexture(a), VisualizeResult::SimpleTexture(b)) => {
+                        ((a, vec![], vec![]), (b, vec![], vec![]))
+                    }
+                    (
+                        VisualizeResult::SimpleTexture(a),
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                    ) => (
+                        (a, vec![], vec![]),
+                        (texture, input_connections, output_connections),
+                    ),
+                    (
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                        VisualizeResult::SimpleTexture(b),
+                    ) => (
+                        (texture, input_connections, output_connections),
+                        (b, vec![], vec![]),
+                    ),
+                    (
+                        VisualizeResult::Block {
+                            texture: a,
+                            input_connections: a_input,
+                            output_connections: a_output,
+                        },
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                    ) => (
+                        (a, a_input, a_output),
+                        (texture, input_connections, output_connections),
+                    ),
+                };
+
+            let max_w = a_texture.width() + b_texture.width();
+            let max_h = a_texture.height().max(b_texture.height());
+
+            let pad = vis::T * 40f32;
+            let mut tx = context.get_texture((max_w as f32 + pad) as _, max_h as _);
+            let mut d = context.rl.begin_drawing(context.thread);
+            let mut d = d.begin_texture_mode(context.thread, &mut tx);
+            let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
+            db.draw_texture_rec(
+                &a_texture,
+                Rectangle {
+                    width: a_texture.width() as _,
+                    height: -a_texture.height() as _,
+                    ..Default::default()
+                },
+                Vector2::new(0f32, ((max_h as f32) - a_texture.height() as f32) / 2f32),
+                Color::WHITE,
+            );
+            db.draw_texture_rec(
+                &b_texture,
+                Rectangle {
+                    width: b_texture.width() as _,
+                    height: -b_texture.height() as _,
+                    ..Default::default()
+                },
+                Vector2::new(
+                    (b_texture.width() as f32 + pad) as f32,
+                    ((max_h as f32) - b_texture.height() as f32) / 2f32,
+                ),
+                Color::WHITE,
+            );
+            drop(db);
+            drop(d);
+
+            (out, VisualizeResult::SimpleTexture(tx))
         }
     }
 
