@@ -90,6 +90,7 @@ pub mod blocks {
                 let mut d = context.rl.begin_drawing(context.thread);
                 let mut d = d.begin_texture_mode(context.thread, &mut tx);
 
+                let center = vis::BOX_SIZE / 2f32;
                 let h = (vis::BOX_SIZE / 2f32) + vis::T;
                 // vis::draw_wave(
                 //     &mut d,
@@ -117,7 +118,14 @@ pub mod blocks {
                     },
                 );
                 drop(d);
-                (out, VisualizeResult::SimpleTexture(tx))
+                (
+                    out,
+                    VisualizeResult::Block {
+                        texture: tx,
+                        input_connections: vec![Vector2::new(0f32, center)],
+                        output_connections: vec![Vector2::new(vis::BOX_SIZE, center)],
+                    },
+                )
             }
         }
     }
@@ -160,7 +168,7 @@ pub mod blocks {
             let mut tx = context.get_texture(vis::BOX_SIZE as _, vis::BOX_SIZE as _);
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
-
+            let center = vis::BOX_SIZE / 2f32;
             let h = (vis::BOX_SIZE / 2f32) + vis::T;
             d.draw_text(
                 &format!("{:?}", self),
@@ -178,7 +186,14 @@ pub mod blocks {
                 },
             );
             drop(d);
-            (out, VisualizeResult::SimpleTexture(tx))
+            (
+                out,
+                VisualizeResult::Block {
+                    texture: tx,
+                    input_connections: vec![Vector2::new(0f32, center)].repeat(N),
+                    output_connections: vec![Vector2::new(vis::BOX_SIZE, center)],
+                },
+            )
         }
     }
 
@@ -217,7 +232,7 @@ pub mod blocks {
             let (a, a_txt) = self.a.process_and_visualize(input.0, context);
             let (b, b_txt) = self.b.process_and_visualize(input.1, context);
 
-            let ((a_texture, a_inputs, a_outputs), (b_texture, b_inputs, b_output)) =
+            let ((a_texture, mut a_inputs, mut a_outputs), (b_texture, mut b_inputs, mut b_output)) =
                 match (a_txt, b_txt) {
                     (VisualizeResult::None, VisualizeResult::None) => {
                         return ((a, b), VisualizeResult::None)
@@ -324,7 +339,23 @@ pub mod blocks {
             drop(db);
             drop(d);
 
-            ((a, b), VisualizeResult::SimpleTexture(tx))
+            for b in b_inputs.iter_mut() {
+                b.y += a_texture.height() as f32 + pad;
+            }
+            for b in b_output.iter_mut() {
+                b.y += a_texture.height() as f32 + pad;
+            }
+            a_inputs.extend(b_inputs);
+            a_outputs.extend(b_output);
+
+            (
+                (a, b),
+                VisualizeResult::Block {
+                    texture: tx,
+                    input_connections: a_inputs,
+                    output_connections: a_outputs,
+                },
+            )
         }
     }
 
@@ -396,7 +427,7 @@ pub mod blocks {
             let (x, in_txt) = self.input.process_and_visualize(input, context);
             let (out, out_txt) = self.output.process_and_visualize(x, context);
 
-            let ((a_texture, a_inputs, a_outputs), (b_texture, b_inputs, b_output)) =
+            let ((a_texture, mut a_inputs, mut a_outputs), (b_texture, mut b_inputs, mut b_output)) =
                 match (in_txt, out_txt) {
                     (VisualizeResult::None, VisualizeResult::None) => {
                         return ((out), VisualizeResult::None)
@@ -480,6 +511,8 @@ pub mod blocks {
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
             let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
+
+            let a_offset = ((max_h as f32) - a_texture.height() as f32) / 2f32;
             db.draw_texture_rec(
                 &a_texture,
                 Rectangle {
@@ -487,8 +520,12 @@ pub mod blocks {
                     height: -a_texture.height() as _,
                     ..Default::default()
                 },
-                Vector2::new(0f32, ((max_h as f32) - a_texture.height() as f32) / 2f32),
+                Vector2::new(0f32, a_offset),
                 Color::WHITE,
+            );
+            let b_txt_pos = Vector2::new(
+                (b_texture.width() as f32 + pad) as f32,
+                ((max_h as f32) - b_texture.height() as f32) / 2f32,
             );
             db.draw_texture_rec(
                 &b_texture,
@@ -497,16 +534,43 @@ pub mod blocks {
                     height: -b_texture.height() as _,
                     ..Default::default()
                 },
-                Vector2::new(
-                    (b_texture.width() as f32 + pad) as f32,
-                    ((max_h as f32) - b_texture.height() as f32) / 2f32,
-                ),
+                b_txt_pos,
                 Color::WHITE,
             );
+
+            // draw connections
+            assert_eq!(a_outputs.len(), b_inputs.len());
+            for a in a_outputs.iter_mut() {
+                a.y += a_offset;
+            }
+
+            for b in b_inputs.iter_mut() {
+                *b += b_txt_pos;
+            }
+
+            for (a, b) in a_outputs.iter().zip(b_inputs.iter()) {
+                db.draw_line_bezier(a, b, vis::T / 2f32, vis::BORDER_COLOR);
+            }
+
             drop(db);
             drop(d);
 
-            (out, VisualizeResult::SimpleTexture(tx))
+            for a in a_inputs.iter_mut() {
+                a.y += a_offset;
+            }
+
+            for b in b_output.iter_mut() {
+                *b += b_txt_pos;
+            }
+
+            (
+                out,
+                VisualizeResult::Block {
+                    texture: tx,
+                    input_connections: a_inputs,
+                    output_connections: b_output,
+                },
+            )
         }
     }
 
