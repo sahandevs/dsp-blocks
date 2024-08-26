@@ -1,4 +1,8 @@
-> (Mostly) Generated using Claude 3 opus
+# DSP Blocks
+my DSP playground
+
+![demo](./demo.png)
+
 
 # Todo List
 
@@ -7,7 +11,7 @@
 ### Basic Signal Processing
 
 - [x] Blocks Core
-- [ ] Vis Core
+- [x] Vis Core
 - [ ] Implement and visualize basic waveforms (sine, square, sawtooth)
 - [ ] Create interactive controls for frequency, amplitude, and phase
 - [ ] Implement signal addition, multiplication, and scaling
