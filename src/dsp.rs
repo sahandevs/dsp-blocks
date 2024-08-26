@@ -1,4 +1,6 @@
 use std::f32::consts::PI;
+
+use crate::vis::{DrawContext, VisualizeResult};
 pub const SR: usize = 44100;
 
 pub type Wave = Vec<f32>;
@@ -7,6 +9,16 @@ pub trait Block<Input> {
     type Output;
 
     fn process(&mut self, input: Input) -> Self::Output;
+
+    fn process_and_visualize(
+        &mut self,
+        input: Input,
+        context: &mut DrawContext,
+    ) -> (Self::Output, VisualizeResult) {
+        let _ = context;
+        let x = self.process(input);
+        (x, VisualizeResult::None)
+    }
 }
 
 pub mod signals {
@@ -30,13 +42,25 @@ pub mod blocks {
     pub use super::*;
 
     pub mod synths {
+        use raylib::{
+            color::Color,
+            math::Rectangle,
+            prelude::{RaylibBlendModeExt, RaylibDraw, RaylibTextureModeExt},
+            texture::{RaylibRenderTexture2D, RaylibTexture2D},
+        };
+
+        use crate::vis;
+
         pub use super::*;
 
         pub struct Oscillator;
 
+        #[derive(Clone)]
         pub enum WaveType {
             Sinusoid,
         }
+
+        #[derive(Clone)]
         pub struct OscillatorControls {
             pub freq: f32,
             pub phase: f32,
@@ -53,6 +77,46 @@ pub mod blocks {
                         signals::create_sinusoid(controls.freq, controls.phase, controls.duration)
                     }
                 }
+            }
+
+            fn process_and_visualize(
+                &mut self,
+                controls: OscillatorControls,
+                context: &mut DrawContext,
+            ) -> (Self::Output, VisualizeResult) {
+                let out = self.process(controls.clone());
+                let mut tx = context.get_texture(vis::BOX_SIZE as _, vis::BOX_SIZE as _);
+                let mut d = context.rl.begin_drawing(context.thread);
+                let mut d = d.begin_texture_mode(context.thread, &mut tx);
+
+                let h = (vis::BOX_SIZE / 2f32) + vis::T;
+                // vis::draw_wave(
+                //     &mut d,
+                //     Rectangle {
+                //         x: vis::T,
+                //         y: 0f32,
+                //         width: vis::BOX_SIZE,
+                //         height: vis::BOX_SIZE,
+                //     },
+                //     &out[..SR],
+                // );
+                d.draw_text(
+                    &format!("{}hz", controls.freq),
+                    (vis::T + 2f32) as _,
+                    (h + 2f32) as _,
+                    1,
+                    vis::TEXT_COLOR,
+                );
+                vis::draw_border(
+                    &mut d,
+                    Rectangle {
+                        height: vis::BOX_SIZE,
+                        width: vis::BOX_SIZE,
+                        ..Default::default()
+                    },
+                );
+                drop(d);
+                (out, VisualizeResult::SimpleTexture(tx))
             }
         }
     }
@@ -111,6 +175,17 @@ pub mod blocks {
             let a = self.a.process(input.0);
             let b = self.b.process(input.1);
             (a, b)
+        }
+
+        fn process_and_visualize(
+            &mut self,
+            input: (I1, I2),
+            context: &mut DrawContext,
+        ) -> (Self::Output, VisualizeResult) {
+            let (a, a_txt) = self.a.process_and_visualize(input.0, context);
+            let (b, b_txt) = self.b.process_and_visualize(input.1, context);
+
+            ((a, b), a_txt)
         }
     }
 
@@ -172,6 +247,17 @@ pub mod blocks {
         fn process(&mut self, input: I1) -> Self::Output {
             let x = self.input.process(input);
             self.output.process(x)
+        }
+
+        fn process_and_visualize(
+            &mut self,
+            input: I1,
+            context: &mut DrawContext,
+        ) -> (Self::Output, VisualizeResult) {
+            let (x, x_txt) = self.input.process_and_visualize(input, context);
+            let (out, out_txt) = self.output.process_and_visualize(x, context);
+
+            (out, x_txt)
         }
     }
 

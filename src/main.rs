@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use raylib::prelude::*;
 use rodio::{OutputStream, Sink, Source};
+use vis::DrawContext;
 pub mod dsp;
 pub mod vis;
 
 const W: i32 = 1080;
 const H: i32 = 720;
-const T: f32 = 3f32;
 
 fn main() -> anyhow::Result<()> {
     let (mut rl, thread) = raylib::init()
@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
         .join(blocks::synths::Oscillator)
         .join(blocks::synths::Oscillator)
         .connect(Basic::Mix);
-    let x_t = sterio_sys.process((
+    let input = (
         (
             synths::OscillatorControls {
                 duration: total_dur.clone(),
@@ -47,7 +47,16 @@ fn main() -> anyhow::Result<()> {
             phase: 0f32,
             wave: synths::WaveType::Sinusoid,
         },
-    ));
+    );
+
+    let (x_t, texture) = {
+        let mut draw_context = DrawContext {
+            thread: &thread,
+            rl: &mut rl,
+        };
+
+        sterio_sys.process_and_visualize(input.clone(), &mut draw_context)
+    };
 
     let mut view_dur = Duration::from_millis(10).as_secs_f32();
     let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();
@@ -62,8 +71,6 @@ fn main() -> anyhow::Result<()> {
     sink.set_volume(0.2);
     sink.play();
 
-    let mut tx = rl.load_render_texture(&thread, 100, 100).unwrap();
-    let mut xxx = 9f32;
     while !rl.window_should_close() {
         let view_offset = (view_offset_dur * dsp::SR as f32) as usize;
         let view_size = (view_dur * dsp::SR as f32) as usize;
@@ -71,17 +78,23 @@ fn main() -> anyhow::Result<()> {
         let view = &full_view[view_offset..view_offset + view_size];
 
         let mut d = rl.begin_drawing(&thread);
-        {
-            let mut d = d.begin_texture_mode(&thread, &mut tx);
-            d.clear_background(Color::BLACK);
-            d.draw_circle(50, 50, 5f32, Color::RED);
-            d.draw_circle(50 + xxx as i32, 50, 5f32, Color::RED);
-            xxx += 0.01f32;
+
+        if let Some(x) = texture.as_simple_texture() {
+            let mut d = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
+            d.draw_texture_rec(
+                &x,
+                Rectangle {
+                    x: 150f32,
+                    y: 150f32,
+                    width: x.width() as _,
+                    height: -x.height() as _ ,
+                },
+                Vector2::new(150f32, 150f32),
+                Color::WHITE,
+            );
         }
 
-        d.draw_texture(&tx, 150, 150, Color::RED);
-
-        d.clear_background(Color::BLACK);
+        d.clear_background(vis::BG_COLOR);
         draw_block_audio_out(&mut d);
 
         let current_sound_pos = (sink.get_pos().as_secs_f32() / total_duration) % total_duration;
@@ -171,7 +184,7 @@ fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
 
     let spacing = rec.width / (n_samples + 1) as f32;
 
-    d.draw_rectangle_rec(rec, Color::BLACK);
+    d.draw_rectangle_rec(rec, vis::BG_COLOR);
     let center_y = rec.y + rec.height / 2f32;
     // center line
 
@@ -183,7 +196,7 @@ fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
         Color::GRAY,
     );
     let mut offset = spacing;
-    let l_w = (5f32 * (T * 1.5 / n_samples as f32)).max(1f32);
+    let l_w = (5f32 * (vis::T * 1.5 / n_samples as f32)).max(1f32);
 
     let get_y = |sample: f32| (center_y - (sample / max) * (rec.height / 2.5f32));
     let mut last_point = get_y(wave[0]);
@@ -211,7 +224,7 @@ fn draw_wave_box(d: &mut RaylibDrawHandle, rec: Rectangle, wave_in: &[f32]) {
     }
 
     // borders
-    d.draw_rectangle_lines_ex(rec, T / 1.5f32, Color::WHITE);
+    d.draw_rectangle_lines_ex(rec, vis::T / 1.5f32, Color::WHITE);
 }
 
 fn draw_block_audio_out(d: &mut RaylibDrawHandle) {
@@ -230,6 +243,6 @@ fn draw_block_audio_out(d: &mut RaylibDrawHandle) {
         width: w as _,
         height: h as _,
     };
-    d.draw_rectangle_lines_ex(rec, T, Color::WHITE);
+    d.draw_rectangle_lines_ex(rec, vis::T, Color::WHITE);
     d.draw_text("Out", x as i32 + p, y as i32 + p, 20, Color::WHITE);
 }
