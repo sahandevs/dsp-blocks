@@ -2,6 +2,7 @@
 rm demo*.png
 cargo run &
 PID=$!
-sleep 2
+sleep 1
 scrot -w $(xdo id -p $PID) 'demo.png' 
 kill $PID
+convert demo.png -transparent black -fill black -opaque white -fuzz 15% -trim +repage demo.png
