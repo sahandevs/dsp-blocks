@@ -5,7 +5,7 @@ use raylib::prelude::*;
 use rodio::Source;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
-pub const BOX_SIZE: f32 = 50f32;
+pub const BOX_SIZE: f32 = 55f32;
 pub const BORDER_COLOR: Color = Color::WHITE;
 pub const BG_COLOR: Color = Color::BLACK;
 pub const TEXT_COLOR: Color = Color::WHITE;
@@ -63,7 +63,7 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
         .reduce(f32::max)
         .unwrap_or_default();
 
-    let spacing = (rec.width / (n_samples + 1) as f32);
+    let spacing = rec.width / (n_samples + 1) as f32;
 
     let center_y = (rec.y + rec.height / 2f32).trunc();
 
@@ -153,7 +153,7 @@ impl Block<Wave> for AudioSink {
         // let current_sound_pos = (sink.get_pos().as_secs_f32() / total_duration) % total_duration;
 
         self.sink.append(source);
-        self.sink.set_volume(0.2);
+        self.sink.set_volume(0.02);
         self.sink.play();
 
         input

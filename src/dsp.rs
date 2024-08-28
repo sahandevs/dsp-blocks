@@ -59,6 +59,8 @@ pub mod blocks {
         pub enum WaveType {
             Sinusoid,
             Square,
+            Triangle,
+            Sawtooth,
         }
 
         #[derive(Clone)]
@@ -81,6 +83,16 @@ pub mod blocks {
                         (2.0 * PI * controls.freq * (x as f32) + controls.phase)
                             .sin()
                             .signum()
+                    }),
+                    WaveType::Triangle => signals::create_periodic_wave(controls.duration, |x| {
+                        (2.0 / PI)
+                            * (2.0 * PI * controls.freq * (x as f32) + controls.phase)
+                                .sin()
+                                .asin()
+                    }),
+                    WaveType::Sawtooth => signals::create_periodic_wave(controls.duration, |x| {
+                        let phase_offset = controls.phase / (2.0 * PI);
+                        2.0 * (((x * controls.freq + phase_offset) % 1.0) - 0.5)
                     }),
                 }
             }

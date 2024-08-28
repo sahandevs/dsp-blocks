@@ -13,7 +13,6 @@ const H: i32 = 720;
 
 fn main() -> anyhow::Result<()> {
     let (mut rl, thread) = raylib::init()
-        .msaa_4x()
         .size(W, H)
         .title("DSP Blocks")
         .build();

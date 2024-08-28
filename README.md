@@ -12,7 +12,8 @@ my DSP playground
 
 - [x] Blocks Core
 - [x] Vis Core
-- [ ] Implement and visualize basic waveforms (sine, square, sawtooth)
+- [x] Implement and visualize basic waveforms (sine, square, sawtooth)
+  - [ ] Implement them using fourier approximation
 - [ ] Create interactive controls for frequency, amplitude, and phase
 - [ ] Implement signal addition, multiplication, and scaling
 - [ ] Visualize envelope detection

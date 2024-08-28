@@ -11,45 +11,45 @@ type Input = (
 );
 
 pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = ()>)> {
-    let total_dur = Duration::from_millis(550);
+    let total_dur = Duration::from_millis(100);
     let sterio_sys = blocks::synths::Oscillator
-        .connect(vis::WaveView::Small)
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::Small))
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::Small))
-        .connect(Basic::Mix)
-        .join(blocks::synths::Oscillator)
-        .connect(Basic::Mix)
-        .connect(vis::AudioSink::try_default()?)
         .connect(vis::WaveView::Grow)
+        .join(blocks::synths::Oscillator.connect(vis::WaveView::Grow))
+        .join(blocks::synths::Oscillator.connect(vis::WaveView::Grow))
+        .connect(Basic::Mix.connect(vis::WaveView::Grow))
+        .join(blocks::synths::Oscillator.connect(vis::WaveView::Grow))
+        .connect(Basic::Mix)
+        .connect(vis::WaveView::Grow)
+        // .connect(vis::AudioSink::try_default()?)
         .connect(blocks::Discard);
     let input = (
         (
             (
                 synths::OscillatorControls {
                     duration: total_dur.clone(),
-                    freq: 440.0,
+                    freq: 27.5f32, // A0
                     phase: 0f32,
                     wave: synths::WaveType::Sinusoid,
                 },
                 synths::OscillatorControls {
                     duration: total_dur.clone(),
-                    freq: 5.0,
+                    freq: 20.6f32, // E0
                     phase: 0f32,
                     wave: synths::WaveType::Square,
                 },
             ),
             synths::OscillatorControls {
                 duration: total_dur.clone(),
-                freq: 73.0,
+                freq: 17.32f32, // C#0
                 phase: 0f32,
-                wave: synths::WaveType::Sinusoid,
+                wave: synths::WaveType::Triangle,
             },
         ),
         synths::OscillatorControls {
             duration: total_dur.clone(),
-            freq: 123.0,
+            freq: 27.5f32 * 2f32,
             phase: 0f32,
-            wave: synths::WaveType::Sinusoid,
+            wave: synths::WaveType::Sawtooth,
         },
     );
 
