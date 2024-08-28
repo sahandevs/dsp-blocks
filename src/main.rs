@@ -58,9 +58,6 @@ fn main() -> anyhow::Result<()> {
         sterio_sys.process_and_visualize(input.clone(), &mut draw_context)
     };
 
-    let mut view_dur = Duration::from_millis(10).as_secs_f32();
-    let mut view_offset_dur = Duration::from_millis(25).as_secs_f32();
-
     let (_stream, stream_handle) = OutputStream::try_default()?;
     let sink = Sink::try_new(&stream_handle)?;
 
@@ -72,10 +69,7 @@ fn main() -> anyhow::Result<()> {
     sink.play();
 
     while !rl.window_should_close() {
-        let view_offset = (view_offset_dur * dsp::SR as f32) as usize;
-        let view_size = (view_dur * dsp::SR as f32) as usize;
         let full_view = &x_t;
-        let view = &full_view[view_offset..view_offset + view_size];
 
         let mut d = rl.begin_drawing(&thread);
 
@@ -120,52 +114,6 @@ fn main() -> anyhow::Result<()> {
             1f32,
             Color::RED,
         );
-
-        let view_select_rec = Rectangle {
-            height: 100f32,
-            x: 10f32 + overview_w * (view_offset as f32 / full_view.len() as f32),
-            y: 10f32,
-            width: overview_w * (view.len() as f32 / full_view.len() as f32),
-        };
-
-        let mut view_select_color = Color::WHITE.alpha(0.2);
-        if view_select_rec.check_collision_point_rec(d.get_mouse_position()) {
-            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_POINTING_HAND);
-
-            view_select_color = Color::WHITE.alpha(0.3);
-
-            let wheel = d.get_mouse_wheel_move();
-            if wheel != 0f32 {
-                view_dur += wheel * 0.001f32;
-            }
-        }
-
-        if overview_rec.check_collision_point_rec(d.get_mouse_position()) {
-            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_POINTING_HAND);
-            if d.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
-                let x_rel = (d.get_mouse_position().x - overview_rec.x) / overview_rec.width;
-                view_offset_dur = total_dur.as_secs_f32() * x_rel;
-            }
-        } else {
-            d.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_DEFAULT);
-        }
-
-        view_dur = view_dur
-            .min(total_dur.as_secs_f32() - view_offset_dur)
-            .max(Duration::from_millis(1).as_secs_f32());
-
-        d.draw_rectangle_rec(view_select_rec, view_select_color);
-
-        // draw_wave_box(
-        //     &mut d,
-        //     Rectangle {
-        //         x: 50f32,
-        //         y: 300f32,
-        //         height: 100f32,
-        //         width: 200f32,
-        //     },
-        //     &view,
-        // );
     }
     Ok(())
 }
