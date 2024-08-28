@@ -1,4 +1,9 @@
+use crate::dsp;
+use crate::dsp::Block;
+use crate::dsp::Wave;
 use raylib::prelude::*;
+use rodio::Source;
+use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 pub const BOX_SIZE: f32 = 50f32;
 pub const BORDER_COLOR: Color = Color::WHITE;
@@ -78,5 +83,106 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
         );
         last_point = y;
         offset += spacing;
+    }
+}
+
+pub fn draw_simple_bock(d: &mut impl RaylibDraw, text: &str) -> Vector2 {
+    let center = BOX_SIZE / 2f32;
+    let h = (BOX_SIZE / 2f32) + T;
+    d.draw_text(text, (T + 2f32) as _, (h + 2f32) as _, 1, TEXT_COLOR);
+    draw_border(
+        d,
+        Rectangle {
+            height: BOX_SIZE,
+            width: BOX_SIZE,
+            ..Default::default()
+        },
+    );
+
+    Vector2::new(center, center)
+}
+
+// visual/analyze blocks
+
+pub struct AudioSink {
+    stream: OutputStream,
+    stream_handle: OutputStreamHandle,
+    sink: Sink,
+}
+
+impl AudioSink {
+    pub fn try_default() -> anyhow::Result<Self> {
+        let (stream, stream_handle) = OutputStream::try_default()?;
+        let sink = Sink::try_new(&stream_handle)?;
+
+        Ok(Self {
+            stream,
+            stream_handle,
+            sink,
+        })
+    }
+}
+
+impl Block<Wave> for AudioSink {
+    type Output = Wave;
+
+    fn process(&mut self, input: Wave) -> Self::Output {
+        let source =
+            rodio::buffer::SamplesBuffer::new(1, dsp::SR as u32, input.clone()).repeat_infinite();
+
+        // let total_duration = input.len() as f32 / dsp::SR as f32;
+        // let current_sound_pos = (sink.get_pos().as_secs_f32() / total_duration) % total_duration;
+
+        self.sink.append(source);
+        self.sink.set_volume(0.2);
+        self.sink.play();
+
+        input
+    }
+
+    fn process_and_visualize(
+        &mut self,
+        input: Wave,
+        context: &mut DrawContext,
+    ) -> (Self::Output, VisualizeResult) {
+        let out = self.process(input);
+        let mut tx = context.get_texture(BOX_SIZE as _, BOX_SIZE as _);
+        let mut d = context.rl.begin_drawing(context.thread);
+        let mut d = d.begin_texture_mode(context.thread, &mut tx);
+
+        let center = draw_simple_bock(&mut d, "Sink");
+
+        // overview
+        //  let overview_w = (W as f32) - 20f32;
+        //  let overview_rec = Rectangle {
+        //      x: 10f32,
+        //      y: 10f32,
+        //      width: overview_w,
+        //      height: 100f32,
+        //  };
+        //  draw_wave_box(&mut d, overview_rec, &full_view);
+
+        //  d.draw_line_ex(
+        //      Vector2::new(
+        //          overview_rec.x + current_sound_pos * overview_w,
+        //          overview_rec.y,
+        //      ),
+        //      Vector2::new(
+        //          overview_rec.x + current_sound_pos * overview_w,
+        //          overview_rec.y + overview_rec.height,
+        //      ),
+        //      1f32,
+        //      Color::RED,
+        //  );
+
+        drop(d);
+        (
+            out,
+            VisualizeResult::Block {
+                texture: tx,
+                input_connections: vec![Vector2::new(0f32, center.y)],
+                output_connections: vec![Vector2::new(BOX_SIZE, center.y)],
+            },
+        )
     }
 }

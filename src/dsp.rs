@@ -90,40 +90,14 @@ pub mod blocks {
                 let mut d = context.rl.begin_drawing(context.thread);
                 let mut d = d.begin_texture_mode(context.thread, &mut tx);
 
-                let center = vis::BOX_SIZE / 2f32;
-                let h = (vis::BOX_SIZE / 2f32) + vis::T;
-                // vis::draw_wave(
-                //     &mut d,
-                //     Rectangle {
-                //         x: vis::T,
-                //         y: 0f32,
-                //         width: vis::BOX_SIZE,
-                //         height: vis::BOX_SIZE,
-                //     },
-                //     &out[..SR],
-                // );
-                d.draw_text(
-                    &format!("{}hz", controls.freq),
-                    (vis::T + 2f32) as _,
-                    (h + 2f32) as _,
-                    1,
-                    vis::TEXT_COLOR,
-                );
-                vis::draw_border(
-                    &mut d,
-                    Rectangle {
-                        height: vis::BOX_SIZE,
-                        width: vis::BOX_SIZE,
-                        ..Default::default()
-                    },
-                );
+                let center = vis::draw_simple_bock(&mut d, &format!("{}hz", controls.freq));
                 drop(d);
                 (
                     out,
                     VisualizeResult::Block {
                         texture: tx,
-                        input_connections: vec![Vector2::new(0f32, center)],
-                        output_connections: vec![Vector2::new(vis::BOX_SIZE, center)],
+                        input_connections: vec![Vector2::new(0f32, center.y)],
+                        output_connections: vec![Vector2::new(vis::BOX_SIZE, center.y)],
                     },
                 )
             }
@@ -168,30 +142,14 @@ pub mod blocks {
             let mut tx = context.get_texture(vis::BOX_SIZE as _, vis::BOX_SIZE as _);
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
-            let center = vis::BOX_SIZE / 2f32;
-            let h = (vis::BOX_SIZE / 2f32) + vis::T;
-            d.draw_text(
-                &format!("{:?}", self),
-                (vis::T + 2f32) as _,
-                (h + 2f32) as _,
-                1,
-                vis::TEXT_COLOR,
-            );
-            vis::draw_border(
-                &mut d,
-                Rectangle {
-                    height: vis::BOX_SIZE,
-                    width: vis::BOX_SIZE,
-                    ..Default::default()
-                },
-            );
+            let center = vis::draw_simple_bock(&mut d, &format!("{:?}", self));
             drop(d);
             (
                 out,
                 VisualizeResult::Block {
                     texture: tx,
-                    input_connections: vec![Vector2::new(0f32, center)].repeat(N),
-                    output_connections: vec![Vector2::new(vis::BOX_SIZE, center)],
+                    input_connections: vec![Vector2::new(0f32, center.y)].repeat(N),
+                    output_connections: vec![Vector2::new(vis::BOX_SIZE, center.y)],
                 },
             )
         }

@@ -1,18 +1,20 @@
 use std::time::Duration;
 
 use crate::dsp::blocks::*;
+use crate::vis;
 
 type Input = (
     (synths::OscillatorControls, synths::OscillatorControls),
     synths::OscillatorControls,
 );
 
-pub fn create_playground_blocks() -> (Input, impl Block<Input, Output = Wave>) {
+pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = Wave>)> {
     let total_dur = Duration::from_millis(1000);
     let sterio_sys = blocks::synths::Oscillator
         .join(blocks::synths::Oscillator)
         .join(blocks::synths::Oscillator)
-        .connect(Basic::Mix);
+        .connect(Basic::Mix)
+        .connect(vis::AudioSink::try_default()?);
     let input = (
         (
             synths::OscillatorControls {
@@ -36,5 +38,5 @@ pub fn create_playground_blocks() -> (Input, impl Block<Input, Output = Wave>) {
         },
     );
 
-    (input, sterio_sys)
+    Ok((input, sterio_sys))
 }
