@@ -1,11 +1,11 @@
 #![allow(non_upper_case_globals)]
 
-use std::time::Duration;
-
+use dsp::Block;
 use raylib::prelude::*;
 use rodio::{OutputStream, Sink, Source};
 use vis::DrawContext;
 pub mod dsp;
+pub mod setups;
 pub mod vis;
 
 const W: i32 = 1080;
@@ -18,36 +18,8 @@ fn main() -> anyhow::Result<()> {
         .title("DSP Blocks")
         .build();
 
-    let total_dur = Duration::from_millis(1000);
-
-    pub use dsp::blocks::*;
-
-    let mut sterio_sys = blocks::synths::Oscillator
-        .join(blocks::synths::Oscillator)
-        .join(blocks::synths::Oscillator)
-        .connect(Basic::Mix);
-    let input = (
-        (
-            synths::OscillatorControls {
-                duration: total_dur.clone(),
-                freq: 440.0,
-                phase: 0f32,
-                wave: synths::WaveType::Sinusoid,
-            },
-            synths::OscillatorControls {
-                duration: total_dur.clone(),
-                freq: 312.0,
-                phase: 0.5f32,
-                wave: synths::WaveType::Sinusoid,
-            },
-        ),
-        synths::OscillatorControls {
-            duration: total_dur.clone(),
-            freq: 73.0,
-            phase: 0f32,
-            wave: synths::WaveType::Sinusoid,
-        },
-    );
+    // select a system
+    let (input, mut system) = setups::playground::create_playground_blocks();
 
     let (x_t, texture) = {
         let mut draw_context = DrawContext {
@@ -55,7 +27,7 @@ fn main() -> anyhow::Result<()> {
             rl: &mut rl,
         };
 
-        sterio_sys.process_and_visualize(input.clone(), &mut draw_context)
+        system.process_and_visualize(input.clone(), &mut draw_context)
     };
 
     let (_stream, stream_handle) = OutputStream::try_default()?;
