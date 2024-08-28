@@ -104,6 +104,15 @@ pub mod blocks {
         }
     }
 
+    pub struct Discard;
+    impl<T> Block<T> for Discard {
+        type Output = ();
+
+        fn process(&mut self, _input: T) -> Self::Output {
+            ()
+        }
+    }
+
     #[derive(Debug)]
     pub enum Basic<const N: usize> {
         Mix,
@@ -274,6 +283,8 @@ pub mod blocks {
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
             let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
+
+            let a_offset = (max_w as f32) - a_texture.width() as f32;
             db.draw_texture_rec(
                 &a_texture,
                 Rectangle {
@@ -281,9 +292,11 @@ pub mod blocks {
                     height: -a_texture.height() as _,
                     ..Default::default()
                 },
-                Vector2::new(0f32, 0f32),
+                Vector2::new(a_offset, 0f32),
                 Color::WHITE,
             );
+
+            let b_offset = (max_w as f32) - b_texture.width() as f32;
             db.draw_texture_rec(
                 &b_texture,
                 Rectangle {
@@ -291,7 +304,7 @@ pub mod blocks {
                     height: -b_texture.height() as _,
                     ..Default::default()
                 },
-                Vector2::new(0f32, (a_texture.height() as f32 + pad) as f32),
+                Vector2::new(b_offset, (a_texture.height() as f32 + pad) as f32),
                 Color::WHITE,
             );
             drop(db);
@@ -299,9 +312,17 @@ pub mod blocks {
 
             for b in b_inputs.iter_mut() {
                 b.y += a_texture.height() as f32 + pad;
+                b.x += b_offset;
             }
             for b in b_output.iter_mut() {
                 b.y += a_texture.height() as f32 + pad;
+                b.x += b_offset;
+            }
+            for a in a_inputs.iter_mut() {
+                a.x += a_offset;
+            }
+            for a in a_outputs.iter_mut() {
+                a.x += a_offset;
             }
             a_inputs.extend(b_inputs);
             a_outputs.extend(b_output);
@@ -482,7 +503,7 @@ pub mod blocks {
                 Color::WHITE,
             );
             let b_txt_pos = Vector2::new(
-                (b_texture.width() as f32 + pad) as f32,
+                (a_texture.width() as f32 + pad) as f32,
                 ((max_h as f32) - b_texture.height() as f32) / 2f32,
             );
             db.draw_texture_rec(
