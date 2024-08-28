@@ -1,8 +1,8 @@
 #![allow(non_upper_case_globals)]
+#![allow(dead_code)]
 
 use dsp::Block;
 use raylib::prelude::*;
-use rodio::{OutputStream, Sink, Source};
 use vis::DrawContext;
 pub mod dsp;
 pub mod setups;

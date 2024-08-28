@@ -485,7 +485,7 @@ pub mod blocks {
             let max_w = a_texture.width() + b_texture.width();
             let max_h = a_texture.height().max(b_texture.height());
 
-            let pad = vis::T * 40f32;
+            let pad = vis::T * 10f32;
             let mut tx = context.get_texture((max_w as f32 + pad) as _, max_h as _);
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);

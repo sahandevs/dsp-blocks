@@ -53,7 +53,7 @@ pub fn draw_border(d: &mut impl RaylibDraw, rec: Rectangle) {
 }
 
 pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
-    let n = (rec.width as usize * rec.width as usize) / 200;
+    let n = rec.width as usize;
     let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
     let wave: Vec<f32> = wave_in.iter().step_by(step).take(n).cloned().collect();
     let n_samples = wave.len();
@@ -84,6 +84,18 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
         last_point = y;
         offset += spacing;
     }
+}
+
+pub fn draw_wave_box(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
+    // center line
+    d.draw_line_ex(
+        Vector2::new(0f32, rec.height / 2f32),
+        Vector2::new(rec.width, rec.height / 2f32),
+        1f32,
+        Color::GRAY,
+    );
+    draw_wave(d, rec, wave_in);
+    draw_border(d, rec);
 }
 
 pub fn draw_simple_bock(d: &mut impl RaylibDraw, text: &str) -> Vector2 {
@@ -152,29 +164,6 @@ impl Block<Wave> for AudioSink {
 
         let center = draw_simple_bock(&mut d, "Sink");
 
-        // overview
-        //  let overview_w = (W as f32) - 20f32;
-        //  let overview_rec = Rectangle {
-        //      x: 10f32,
-        //      y: 10f32,
-        //      width: overview_w,
-        //      height: 100f32,
-        //  };
-        //  draw_wave_box(&mut d, overview_rec, &full_view);
-
-        //  d.draw_line_ex(
-        //      Vector2::new(
-        //          overview_rec.x + current_sound_pos * overview_w,
-        //          overview_rec.y,
-        //      ),
-        //      Vector2::new(
-        //          overview_rec.x + current_sound_pos * overview_w,
-        //          overview_rec.y + overview_rec.height,
-        //      ),
-        //      1f32,
-        //      Color::RED,
-        //  );
-
         drop(d);
         (
             out,
@@ -182,6 +171,65 @@ impl Block<Wave> for AudioSink {
                 texture: tx,
                 input_connections: vec![Vector2::new(0f32, center.y)],
                 output_connections: vec![Vector2::new(BOX_SIZE, center.y)],
+            },
+        )
+    }
+}
+
+pub enum WaveView {
+    Grow,
+    Small,
+}
+
+impl Block<Wave> for WaveView {
+    type Output = Wave;
+
+    fn process(&mut self, input: Wave) -> Self::Output {
+        input
+    }
+
+    fn process_and_visualize(
+        &mut self,
+        input: Wave,
+        context: &mut DrawContext,
+    ) -> (Self::Output, VisualizeResult) {
+        let out = self.process(input);
+
+        let unit = 2f32 * BOX_SIZE;
+        let rec = match self {
+            WaveView::Grow => {
+                // unit per SR
+                Rectangle {
+                    width: ((out.len() / dsp::SR) + 1) as f32 * (unit * 2f32),
+                    height: 80f32,
+                    x: 0f32,
+                    y: 0f32,
+                }
+            }
+            WaveView::Small => {
+                // fit everything in unit
+                Rectangle {
+                    width: unit,
+                    height: 50f32,
+                    x: 0f32,
+                    y: 0f32,
+                }
+            }
+        };
+
+        let mut tx = context.get_texture(rec.width as _, rec.height as _);
+        let mut d = context.rl.begin_drawing(context.thread);
+        let mut d = d.begin_texture_mode(context.thread, &mut tx);
+
+        draw_wave_box(&mut d, rec, &out);
+
+        drop(d);
+        (
+            out,
+            VisualizeResult::Block {
+                texture: tx,
+                input_connections: vec![Vector2::new(0f32, rec.height / 2f32)],
+                output_connections: vec![Vector2::new(rec.width, rec.height / 2f32)],
             },
         )
     }
