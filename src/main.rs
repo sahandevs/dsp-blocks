@@ -53,6 +53,8 @@ fn main() -> anyhow::Result<()> {
             cam.target +=
                 delta * (1.0 - (1.0 / (cam.zoom / (cam.zoom + wheel as f32 * zoom_increment))));
         }
+        cam.target.x = cam.target.x.trunc();
+        cam.target.y = cam.target.y.trunc();
 
         // panning
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_RIGHT) {

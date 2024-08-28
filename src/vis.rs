@@ -53,7 +53,7 @@ pub fn draw_border(d: &mut impl RaylibDraw, rec: Rectangle) {
 }
 
 pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
-    let n = rec.width as usize;
+    let n = rec.width.trunc() as usize;
     let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
     let wave: Vec<f32> = wave_in.iter().step_by(step).take(n).cloned().collect();
     let n_samples = wave.len();
@@ -63,14 +63,13 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
         .reduce(f32::max)
         .unwrap_or_default();
 
-    let spacing = rec.width / (n_samples + 1) as f32;
+    let spacing = (rec.width / (n_samples + 1) as f32);
 
-    let center_y = rec.y + rec.height / 2f32;
+    let center_y = (rec.y + rec.height / 2f32).trunc();
 
     let mut offset = spacing;
-    let l_w = (5f32 * (T * 1.5 / n_samples as f32)).max(1f32);
 
-    let get_y = |sample: f32| (center_y - (sample / max) * (rec.height / 2.5f32));
+    let get_y = |sample: f32| (center_y - (sample / max) * (rec.height / 2.5f32)).trunc();
     let mut last_point = get_y(wave[0]);
     for sample in wave {
         let y = get_y(sample);
@@ -78,10 +77,11 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
         d.draw_line_ex(
             Vector2::new(rec.x + offset - spacing, last_point),
             Vector2::new(rec.x + offset, y),
-            l_w,
+            1f32,
             COLOR,
         );
         last_point = y;
+        // d.draw_pixel((rec.x + offset) as _, y as _, Color::RED);
         offset += spacing;
     }
 }
@@ -89,8 +89,8 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
 pub fn draw_wave_box(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
     // center line
     d.draw_line_ex(
-        Vector2::new(0f32, rec.height / 2f32),
-        Vector2::new(rec.width, rec.height / 2f32),
+        Vector2::new(0f32, (rec.height / 2f32).trunc()),
+        Vector2::new(rec.width, (rec.height / 2f32).trunc()),
         1f32,
         Color::GRAY,
     );
@@ -99,9 +99,16 @@ pub fn draw_wave_box(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
 }
 
 pub fn draw_simple_bock(d: &mut impl RaylibDraw, text: &str) -> Vector2 {
-    let center = BOX_SIZE / 2f32;
+    let center = (BOX_SIZE / 2f32).trunc();
     let h = (BOX_SIZE / 2f32) + T;
-    d.draw_text(text, (T + 2f32) as _, (h + 2f32) as _, 1, TEXT_COLOR);
+    let num_lines = text.split("\n").count();
+    d.draw_text(
+        text,
+        (T + 2f32) as _,
+        ((h + 2f32) - ((num_lines - 1) as f32 * 10f32)).trunc() as _,
+        3,
+        TEXT_COLOR,
+    );
     draw_border(
         d,
         Rectangle {
@@ -201,7 +208,7 @@ impl Block<Wave> for WaveView {
                 // unit per SR
                 Rectangle {
                     width: ((out.len() / dsp::SR) + 1) as f32 * (unit * 2f32),
-                    height: 80f32,
+                    height: 50f32,
                     x: 0f32,
                     y: 0f32,
                 }

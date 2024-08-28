@@ -30,15 +30,14 @@ pub trait Block<Input> {
 pub mod signals {
     pub use super::*;
 
-    pub fn create_sinusoid(freq: f32, phase: f32, duration: std::time::Duration) -> Wave {
+    pub fn create_periodic_wave<T: Fn(f32) -> f32>(duration: std::time::Duration, fun: T) -> Wave {
         let num_samples = (SR as f32 * duration.as_secs_f32()) as usize;
 
         let step = duration.as_secs_f32() / num_samples as f32;
 
         let mut wave = vec![0f32; num_samples];
         for i in 0..num_samples {
-            let value = 2.0 * PI * freq * (step * i as f32) + phase;
-            wave[i] = value.sin();
+            wave[i] = fun(step * i as f32);
         }
         wave
     }
@@ -56,9 +55,10 @@ pub mod blocks {
 
         pub struct Oscillator;
 
-        #[derive(Clone)]
+        #[derive(Clone, Debug)]
         pub enum WaveType {
             Sinusoid,
+            Square,
         }
 
         #[derive(Clone)]
@@ -74,9 +74,14 @@ pub mod blocks {
 
             fn process(&mut self, controls: OscillatorControls) -> Self::Output {
                 match controls.wave {
-                    WaveType::Sinusoid => {
-                        signals::create_sinusoid(controls.freq, controls.phase, controls.duration)
-                    }
+                    WaveType::Sinusoid => signals::create_periodic_wave(controls.duration, |x| {
+                        (2.0 * PI * controls.freq * (x as f32) + controls.phase).sin()
+                    }),
+                    WaveType::Square => signals::create_periodic_wave(controls.duration, |x| {
+                        (2.0 * PI * controls.freq * (x as f32) + controls.phase)
+                            .sin()
+                            .signum()
+                    }),
                 }
             }
 
@@ -90,7 +95,10 @@ pub mod blocks {
                 let mut d = context.rl.begin_drawing(context.thread);
                 let mut d = d.begin_texture_mode(context.thread, &mut tx);
 
-                let center = vis::draw_simple_bock(&mut d, &format!("{}hz", controls.freq));
+                let center = vis::draw_simple_bock(
+                    &mut d,
+                    &format!("{:?}\n{}hz", controls.wave, controls.freq),
+                );
                 drop(d);
                 (
                     out,
@@ -491,7 +499,7 @@ pub mod blocks {
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
             let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
 
-            let a_offset = ((max_h as f32) - a_texture.height() as f32) / 2f32;
+            let a_offset = (((max_h as f32) - a_texture.height() as f32) / 2f32).trunc();
             db.draw_texture_rec(
                 &a_texture,
                 Rectangle {
@@ -504,7 +512,7 @@ pub mod blocks {
             );
             let b_txt_pos = Vector2::new(
                 (a_texture.width() as f32 + pad) as f32,
-                ((max_h as f32) - b_texture.height() as f32) / 2f32,
+                (((max_h as f32) - b_texture.height() as f32) / 2f32).trunc(),
             );
             db.draw_texture_rec(
                 &b_texture,
@@ -528,7 +536,7 @@ pub mod blocks {
             }
 
             for (a, b) in a_outputs.iter().zip(b_inputs.iter()) {
-                db.draw_line_bezier(a, b, vis::T / 2f32, vis::BORDER_COLOR);
+                db.draw_line_bezier(a, b, 1f32, vis::BORDER_COLOR);
             }
 
             drop(db);

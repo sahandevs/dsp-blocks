@@ -11,10 +11,11 @@ type Input = (
 );
 
 pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = ()>)> {
-    let total_dur = Duration::from_millis(1000);
+    let total_dur = Duration::from_millis(550);
     let sterio_sys = blocks::synths::Oscillator
+        .connect(vis::WaveView::Small)
         .join(blocks::synths::Oscillator.connect(vis::WaveView::Small))
-        .join(blocks::synths::Oscillator)
+        .join(blocks::synths::Oscillator.connect(vis::WaveView::Small))
         .connect(Basic::Mix)
         .join(blocks::synths::Oscillator)
         .connect(Basic::Mix)
@@ -32,9 +33,9 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
                 },
                 synths::OscillatorControls {
                     duration: total_dur.clone(),
-                    freq: 312.0,
-                    phase: 0.5f32,
-                    wave: synths::WaveType::Sinusoid,
+                    freq: 5.0,
+                    phase: 0f32,
+                    wave: synths::WaveType::Square,
                 },
             ),
             synths::OscillatorControls {
