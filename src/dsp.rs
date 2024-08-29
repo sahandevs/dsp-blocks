@@ -103,22 +103,10 @@ pub mod blocks {
                 context: &mut DrawContext,
             ) -> (Self::Output, VisualizeResult) {
                 let out = self.process(controls.clone());
-                let mut tx = context.get_texture(vis::BOX_SIZE as _, vis::BOX_SIZE as _);
-                let mut d = context.rl.begin_drawing(context.thread);
-                let mut d = d.begin_texture_mode(context.thread, &mut tx);
-
-                let center = vis::draw_simple_bock(
-                    &mut d,
-                    &format!("{:?}\n{}hz", controls.wave, controls.freq),
-                );
-                drop(d);
-                (
+                vis::visualize_simple_box(
+                    context,
+                    &format!("{:?}\n{}Hz", controls.wave, controls.freq),
                     out,
-                    VisualizeResult::Block {
-                        texture: tx,
-                        input_connections: vec![Vector2::new(0f32, center.y)],
-                        output_connections: vec![Vector2::new(vis::BOX_SIZE, center.y)],
-                    },
                 )
             }
         }
@@ -168,17 +156,21 @@ pub mod blocks {
             context: &mut DrawContext,
         ) -> (Self::Output, VisualizeResult) {
             let out = self.process(input);
-            let mut tx = context.get_texture(vis::BOX_SIZE as _, vis::BOX_SIZE as _);
-            let mut d = context.rl.begin_drawing(context.thread);
-            let mut d = d.begin_texture_mode(context.thread, &mut tx);
-            let center = vis::draw_simple_bock(&mut d, &format!("{:?}", self));
-            drop(d);
+            let (out, vis_result) = vis::visualize_simple_box(context, &format!("{:?}", self), out);
+
             (
                 out,
-                VisualizeResult::Block {
-                    texture: tx,
-                    input_connections: vec![Vector2::new(0f32, center.y)].repeat(N),
-                    output_connections: vec![Vector2::new(vis::BOX_SIZE, center.y)],
+                match vis_result {
+                    VisualizeResult::Block {
+                        texture,
+                        input_connections,
+                        output_connections,
+                    } => VisualizeResult::Block {
+                        texture,
+                        input_connections: input_connections.repeat(N),
+                        output_connections,
+                    },
+                    x => x,
                 },
             )
         }

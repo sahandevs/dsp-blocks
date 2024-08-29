@@ -123,6 +123,27 @@ pub fn draw_simple_bock(d: &mut impl RaylibDraw, text: &str) -> Vector2 {
 
 // visual/analyze blocks
 
+pub fn visualize_simple_box<O>(
+    context: &mut DrawContext,
+    text: &str,
+    out: O,
+) -> (O, VisualizeResult) {
+    let mut tx = context.get_texture(BOX_SIZE as _, BOX_SIZE as _);
+    let mut d = context.rl.begin_drawing(context.thread);
+    let mut d = d.begin_texture_mode(context.thread, &mut tx);
+
+    let center = draw_simple_bock(&mut d, text);
+    drop(d);
+    (
+        out,
+        VisualizeResult::Block {
+            texture: tx,
+            input_connections: vec![Vector2::new(0f32, center.y)],
+            output_connections: vec![Vector2::new(BOX_SIZE, center.y)],
+        },
+    )
+}
+
 pub struct AudioSink {
     stream: OutputStream,
     stream_handle: OutputStreamHandle,
@@ -165,21 +186,7 @@ impl Block<Wave> for AudioSink {
         context: &mut DrawContext,
     ) -> (Self::Output, VisualizeResult) {
         let out = self.process(input);
-        let mut tx = context.get_texture(BOX_SIZE as _, BOX_SIZE as _);
-        let mut d = context.rl.begin_drawing(context.thread);
-        let mut d = d.begin_texture_mode(context.thread, &mut tx);
-
-        let center = draw_simple_bock(&mut d, "Sink");
-
-        drop(d);
-        (
-            out,
-            VisualizeResult::Block {
-                texture: tx,
-                input_connections: vec![Vector2::new(0f32, center.y)],
-                output_connections: vec![Vector2::new(BOX_SIZE, center.y)],
-            },
-        )
+        visualize_simple_box(context, "Sink", out)
     }
 }
 
