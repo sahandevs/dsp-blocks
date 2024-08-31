@@ -13,6 +13,7 @@ const H: i32 = 720;
 
 fn main() -> anyhow::Result<()> {
     let (mut rl, thread) = raylib::init()
+        .msaa_4x()
         .size(W, H)
         .title("DSP Blocks")
         .build();
@@ -52,8 +53,6 @@ fn main() -> anyhow::Result<()> {
             cam.target +=
                 delta * (1.0 - (1.0 / (cam.zoom / (cam.zoom + wheel as f32 * zoom_increment))));
         }
-        cam.target.x = cam.target.x.trunc();
-        cam.target.y = cam.target.y.trunc();
 
         // panning
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_RIGHT) {
@@ -61,11 +60,15 @@ fn main() -> anyhow::Result<()> {
             cam.target += delta;
         }
 
+        cam.target.x = cam.target.x.trunc();
+        cam.target.y = cam.target.y.trunc();
+
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(vis::BG_COLOR);
         {
             let mut d = d.begin_mode2D(cam);
             if let Some(x) = texture.as_simple_texture() {
+                x.set_texture_filter(&thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
                 let mut d = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
                 d.draw_texture_rec(
                     &x,

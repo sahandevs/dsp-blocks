@@ -16,7 +16,7 @@ my DSP playground
   - [ ] Implement them using fourier approximation
 - [ ] Create interactive controls for frequency, amplitude, and phase
 - [ ] Implement signal addition, multiplication, and scaling
-- [ ] Visualize envelope detection
+- [ ] [Visualize envelope detection](https://youtu.be/rlypsap6Wow?list=PL-wATfeyAMNqIee7cH3q1bh4QJFAaeNv0&t=995)
 - [ ] Implement Discrete Fourier Transform (DFT) from scratch
 - [ ] Visualize frequency spectrum
 - [ ] Compare your DFT with numpy's FFT

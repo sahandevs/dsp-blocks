@@ -292,6 +292,7 @@ pub mod blocks {
 
             let pad = vis::T * 3f32;
             let mut tx = context.get_texture(max_w as _, (max_h as f32 + pad) as _);
+            tx.set_texture_filter(context.thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
             let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
@@ -499,6 +500,7 @@ pub mod blocks {
 
             let pad = vis::T * 10f32;
             let mut tx = context.get_texture((max_w as f32 + pad) as _, max_h as _);
+            tx.set_texture_filter(context.thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
             let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
