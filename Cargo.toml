@@ -3,7 +3,11 @@ name = "dsp-blocks"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = ["dylib"]
+
 [dependencies]
 anyhow = "1.0.86"
 raylib = "5.0.1"
 rodio = "0.19.0"
+libloading = "0.8.5"

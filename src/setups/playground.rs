@@ -10,7 +10,7 @@ type Input = (
     OscillatorControls,
 );
 
-pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = ()>)> {
+pub fn create_playground_blocks() -> anyhow::Result<impl Block<(), Output = ()>> {
     let total_dur = Duration::from_millis(100);
     let sterio_sys = blocks::synths::Oscillator
         .connect(vis::WaveView::grow())
@@ -53,5 +53,6 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
         },
     );
 
-    Ok((input, sterio_sys))
+    let out = blocks::DefaultInput(Box::new(move || input.clone())).connect(sterio_sys);
+    Ok(out)
 }

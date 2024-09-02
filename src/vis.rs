@@ -26,6 +26,7 @@ impl<'a, 'b> DrawContext<'a, 'b> {
     }
 }
 
+#[repr(C)]
 pub enum VisualizeResult {
     None,
     SimpleTexture(RenderTexture2D),

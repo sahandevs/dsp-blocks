@@ -2,9 +2,8 @@
 #![allow(dead_code)]
 
 use control::ControlContext;
-use dsp::Block;
 use raylib::prelude::*;
-use vis::DrawContext;
+use vis::{DrawContext, VisualizeResult};
 pub mod control;
 pub mod dsp;
 pub mod setups;
@@ -13,30 +12,30 @@ pub mod vis;
 const W: i32 = 1080;
 const H: i32 = 720;
 
+fn load_setup(ctx: &mut DrawContext) -> anyhow::Result<VisualizeResult> {
+    unsafe {
+        let lib = libloading::Library::new("./target/debug/libdsp_blocks.so")?;
+
+        let func: libloading::Symbol<extern "C" fn(&mut DrawContext) -> VisualizeResult> =
+            lib.get(b"get_setup")?;
+        println!("lol {func:?}");
+        Ok(func(ctx))
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     let (mut rl, thread) = raylib::init()
         .msaa_4x()
         .size(W, H)
         .title("DSP Blocks")
         .build();
+    let mut draw_context = DrawContext {
+        thread: &thread,
+        rl: &mut rl,
+    };
 
-    // select a system
-    let (input, mut system) = setups::playground::create_playground_blocks()?;
-    let mut texture;
-
-    macro_rules! redraw {
-        () => {{
-            let mut draw_context = DrawContext {
-                thread: &thread,
-                rl: &mut rl,
-            };
-
-            let (_, t) = system.process_and_visualize(input.clone(), &mut draw_context);
-            texture = t;
-        }};
-    }
-
-    redraw!();
+    println!("?");
+    let texture = load_setup(&mut draw_context)?;
 
     rl.set_target_fps(60);
 
@@ -52,7 +51,7 @@ fn main() -> anyhow::Result<()> {
 
     let sys_pos = Vector2::new(50.0, 100.0);
 
-    let mut last_time_hover = false;
+    // let mut last_time_hover = false;
     while !rl.window_should_close() {
         let mouse_pos = rl.get_mouse_position();
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_pos, cam);
@@ -79,35 +78,36 @@ fn main() -> anyhow::Result<()> {
         cam.target.y = cam.target.y.trunc();
 
         // interactive controls
-        let mut needs_total_redraw = false;
-        if let Some(x) = texture.as_simple_texture() {
-            let tx_rec = Rectangle {
-                width: x.width() as _,
-                height: x.height() as _,
-                x: sys_pos.x,
-                y: sys_pos.y,
-            };
-            let mut control_ctx = ControlContext {
-                thread: &thread,
-                rl: &mut rl,
-                is_dirty: false,
-            };
-            if tx_rec.check_collision_point_rec(mouse_world_pos) {
-                if mouse_delta.length() > 0f32 {
-                    system.on_hover(mouse_world_pos - sys_pos, &mut control_ctx);
-                    last_time_hover = true;
-                }
-            } else if last_time_hover {
-                system.on_unhover(&mut control_ctx);
-                last_time_hover = false;
-            }
-            needs_total_redraw = control_ctx.is_dirty;
-        }
+        // let mut needs_total_redraw = false;
+        // if let Some(x) = texture.as_simple_texture() {
+        //     let tx_rec = Rectangle {
+        //         width: x.width() as _,
+        //         height: x.height() as _,
+        //         x: sys_pos.x,
+        //         y: sys_pos.y,
+        //     };
+        //     let mut control_ctx = ControlContext {
+        //         thread: &thread,
+        //         rl: &mut rl,
+        //         is_dirty: false,
+        //     };
+        //     if tx_rec.check_collision_point_rec(mouse_world_pos) {
+        //         if mouse_delta.length() > 0f32 {
+        //             // system.on_hover(mouse_world_pos - sys_pos, &mut control_ctx);
+        //             last_time_hover = true;
+        //         }
+        //     } else if last_time_hover {
+        //         // system.on_unhover(&mut control_ctx);
+        //         last_time_hover = false;
+        //     }
+        //     needs_total_redraw = control_ctx.is_dirty;
+        // }
 
-        if needs_total_redraw {
-            println!("did redraw");
-            redraw!();
-        }
+        // if needs_total_redraw {
+        //     println!("did redraw");
+        //     std::mem::forget(texture);
+        //     redraw!();
+        // }
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(vis::BG_COLOR);

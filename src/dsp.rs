@@ -139,6 +139,22 @@ pub mod blocks {
         }
     }
 
+    pub struct DefaultInput<T>(pub Box<dyn Fn() -> T>);
+    impl<T> Debug for DefaultInput<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_tuple("DefaultInput").finish()
+        }
+    }
+
+    impl<T> Block<()> for DefaultInput<T> {
+        type Output = T;
+
+        fn process(&mut self, _input: ()) -> Self::Output {
+            println!("?xx");
+            self.0()
+        }
+    }
+
     #[derive(Debug)]
     pub enum Basic<const N: usize> {
         Mix,
