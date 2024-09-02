@@ -1,6 +1,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(dead_code)]
 
+use std::env;
+
 use control::ControlContext;
 use dsp::Block;
 use raylib::prelude::*;
@@ -133,8 +135,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         // Draw UI elements
-        d.draw_text(&format!("Zoom: {:.2}", cam.zoom), 10, 10, 20, Color::WHITE);
-        d.draw_text(&format!("Debug: {}", &debug), 10, 30, 20, Color::WHITE);
+        if env::var("NO_TEXT").unwrap_or_default().is_empty() {
+            d.draw_text(&format!("Zoom: {:.2}", cam.zoom), 10, 10, 20, Color::WHITE);
+            d.draw_text(&format!("Debug: {}", &debug), 10, 30, 20, Color::WHITE);
+        }
     }
     Ok(())
 }

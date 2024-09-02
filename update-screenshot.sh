@@ -1,6 +1,6 @@
 #!/bin/bash
 rm demo*.png
-cargo run &
+NO_TEXT=Y cargo run &
 PID=$!
 sleep 1
 scrot -w $(xdo id -p $PID) 'demo.png' 

@@ -142,6 +142,8 @@ pub mod blocks {
     #[derive(Debug)]
     pub enum Basic<const N: usize> {
         Mix,
+        Amp,
+        Diff,
     }
 
     impl<T: IntoArray<[Wave; N]>, const N: usize> Block<T> for Basic<N> {
@@ -149,18 +151,39 @@ pub mod blocks {
 
         fn process(&mut self, input: T) -> Self::Output {
             let input = input.into();
+            let len = input[0].len();
+            assert!(
+                input.iter().all(|wave| wave.len() == len),
+                "All input waves must have the same length"
+            );
+
             match self {
                 Basic::Mix => {
-                    let len = input[0].len();
-                    assert!(
-                        input.iter().all(|wave| wave.len() == len),
-                        "All input waves must have the same length"
-                    );
-
                     let mut wave = vec![0f32; len];
                     for i in 0..len {
                         let sum: f32 = input.iter().map(|w| w[i]).sum();
                         wave[i] = sum / N as f32;
+                    }
+
+                    wave
+                }
+                Basic::Amp => {
+                    let mut wave = vec![0f32; len];
+                    for i in 0..len {
+                        let amp: f32 = input.iter().map(|w| w[i]).fold(1f32, |acc, x| acc * x);
+                        wave[i] = amp;
+                    }
+
+                    wave
+                }
+                Basic::Diff => {
+                    let mut wave = vec![0f32; len];
+                    for i in 1..len {
+                        let acc: f32 = input.iter().map(|w| w[i]).sum();
+                        wave[i] = acc;
+                    }
+                    for (i, v) in input[0].iter().enumerate() {
+                        wave[i] = v - wave[i];
                     }
 
                     wave
