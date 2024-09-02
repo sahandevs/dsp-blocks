@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::dsp;
 use crate::dsp::Block;
 use crate::dsp::Wave;
@@ -129,7 +131,10 @@ pub fn visualize_simple_box<O>(
     out: O,
 ) -> (O, VisualizeResult) {
     let mut tx = context.get_texture(BOX_SIZE as _, BOX_SIZE as _);
-    tx.set_texture_filter(context.thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
+    tx.set_texture_filter(
+        context.thread,
+        raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X,
+    );
     let mut d = context.rl.begin_drawing(context.thread);
     let mut d = d.begin_texture_mode(context.thread, &mut tx);
 
@@ -149,6 +154,12 @@ pub struct AudioSink {
     stream: OutputStream,
     stream_handle: OutputStreamHandle,
     sink: Sink,
+}
+
+impl Debug for AudioSink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AudioSink").finish()
+    }
 }
 
 impl AudioSink {
@@ -191,6 +202,7 @@ impl Block<Wave> for AudioSink {
     }
 }
 
+#[derive(Debug)]
 pub enum WaveView {
     Grow,
     Small,
@@ -233,7 +245,10 @@ impl Block<Wave> for WaveView {
         };
 
         let mut tx = context.get_texture(rec.width as _, rec.height as _);
-        tx.set_texture_filter(context.thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
+        tx.set_texture_filter(
+            context.thread,
+            raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X,
+        );
         let mut d = context.rl.begin_drawing(context.thread);
         let mut d = d.begin_texture_mode(context.thread, &mut tx);
 

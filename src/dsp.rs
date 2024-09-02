@@ -1,5 +1,5 @@
-use crate::vis;
 use crate::vis::{DrawContext, VisualizeResult};
+use crate::{control, vis};
 use raylib::texture::RaylibTexture2D;
 use raylib::{color::Color, ffi::BlendMode, math::Vector2, prelude::RaylibBlendModeExt};
 use raylib::{
@@ -7,11 +7,12 @@ use raylib::{
     prelude::{RaylibDraw, RaylibTextureModeExt},
 };
 use std::f32::consts::PI;
+use std::fmt::Debug;
 pub const SR: usize = 44100;
 
 pub type Wave = Vec<f32>;
 
-pub trait Block<Input> {
+pub trait Block<Input>: Debug {
     type Output;
 
     fn process(&mut self, input: Input) -> Self::Output;
@@ -24,6 +25,16 @@ pub trait Block<Input> {
         let _ = context;
         let x = self.process(input);
         (x, VisualizeResult::None)
+    }
+
+    fn on_hover(
+        &mut self,
+        pos: Vector2,
+        context: &mut control::ControlContext,
+    ) -> control::ControlResult {
+        let _ = context;
+        let _ = pos;
+        control::ControlResult::Passthrough
     }
 }
 
@@ -53,6 +64,7 @@ pub mod blocks {
 
         pub use super::*;
 
+        #[derive(Debug)]
         pub struct Oscillator;
 
         #[derive(Clone, Debug)]
@@ -112,6 +124,7 @@ pub mod blocks {
         }
     }
 
+    #[derive(Debug)]
     pub struct Discard;
     impl<T> Block<T> for Discard {
         type Output = ();
@@ -185,9 +198,13 @@ pub mod blocks {
             Self: Block<I1, Output = O1>;
     }
 
+    #[derive(Debug)]
     pub struct JoinedBlocks<S1, S2> {
         a: S1,
         b: S2,
+
+        a_tx_rec: Rectangle,
+        b_tx_rec: Rectangle,
     }
 
     impl<S1, S2, I1, I2, O1, O2> Block<(I1, I2)> for JoinedBlocks<S1, S2>
@@ -214,11 +231,25 @@ pub mod blocks {
             let ((a_texture, mut a_inputs, mut a_outputs), (b_texture, mut b_inputs, mut b_output)) =
                 match (a_txt, b_txt) {
                     (VisualizeResult::None, VisualizeResult::None) => {
-                        return ((a, b), VisualizeResult::None)
+                        self.a_tx_rec = Default::default();
+                        self.b_tx_rec = Default::default();
+                        return (((a, b)), VisualizeResult::None);
                     }
-                    (VisualizeResult::None, VisualizeResult::SimpleTexture(x))
-                    | (VisualizeResult::SimpleTexture(x), VisualizeResult::None) => {
-                        return ((a, b), VisualizeResult::SimpleTexture(x))
+                    (VisualizeResult::None, VisualizeResult::SimpleTexture(x)) => {
+                        self.a_tx_rec = Default::default();
+                        self.b_tx_rec.width = x.width().abs() as _;
+                        self.b_tx_rec.height = x.height().abs() as _;
+                        self.b_tx_rec.x = 0f32;
+                        self.b_tx_rec.y = 0f32;
+                        return (((a, b)), VisualizeResult::SimpleTexture(x));
+                    }
+                    (VisualizeResult::SimpleTexture(x), VisualizeResult::None) => {
+                        self.b_tx_rec = Default::default();
+                        self.a_tx_rec.width = x.width().abs() as _;
+                        self.a_tx_rec.height = x.height().abs() as _;
+                        self.a_tx_rec.x = 0f32;
+                        self.a_tx_rec.y = 0f32;
+                        return (((a, b)), VisualizeResult::SimpleTexture(x));
                     }
                     (
                         VisualizeResult::None,
@@ -227,8 +258,22 @@ pub mod blocks {
                             input_connections,
                             output_connections,
                         },
-                    )
-                    | (
+                    ) => {
+                        self.a_tx_rec = Default::default();
+                        self.b_tx_rec.width = texture.width().abs() as _;
+                        self.b_tx_rec.height = texture.height().abs() as _;
+                        self.b_tx_rec.x = 0f32;
+                        self.b_tx_rec.y = 0f32;
+                        return (
+                            ((a, b)),
+                            VisualizeResult::Block {
+                                texture,
+                                input_connections,
+                                output_connections,
+                            },
+                        );
+                    }
+                    (
                         VisualizeResult::Block {
                             texture,
                             input_connections,
@@ -236,14 +281,19 @@ pub mod blocks {
                         },
                         VisualizeResult::None,
                     ) => {
+                        self.b_tx_rec = Default::default();
+                        self.a_tx_rec.width = texture.width().abs() as _;
+                        self.a_tx_rec.height = texture.height().abs() as _;
+                        self.a_tx_rec.x = 0f32;
+                        self.a_tx_rec.y = 0f32;
                         return (
-                            (a, b),
+                            ((a, b)),
                             VisualizeResult::Block {
                                 texture,
                                 input_connections,
                                 output_connections,
                             },
-                        )
+                        );
                     }
                     (VisualizeResult::SimpleTexture(a), VisualizeResult::SimpleTexture(b)) => {
                         ((a, vec![], vec![]), (b, vec![], vec![]))
@@ -292,7 +342,10 @@ pub mod blocks {
 
             let pad = vis::T * 3f32;
             let mut tx = context.get_texture(max_w as _, (max_h as f32 + pad) as _);
-            tx.set_texture_filter(context.thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
+            tx.set_texture_filter(
+                context.thread,
+                raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X,
+            );
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
             let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
@@ -308,8 +361,13 @@ pub mod blocks {
                 Vector2::new(a_offset, 0f32),
                 Color::WHITE,
             );
+            self.a_tx_rec.width = a_texture.width() as _;
+            self.a_tx_rec.height = a_texture.height() as _;
+            self.a_tx_rec.x = a_offset;
+            self.a_tx_rec.y = 0f32;
 
             let b_offset = (max_w as f32) - b_texture.width() as f32;
+            let b_offset_y = (a_texture.height() as f32 + pad) as f32;
             db.draw_texture_rec(
                 &b_texture,
                 Rectangle {
@@ -317,9 +375,13 @@ pub mod blocks {
                     height: -b_texture.height() as _,
                     ..Default::default()
                 },
-                Vector2::new(b_offset, (a_texture.height() as f32 + pad) as f32),
+                Vector2::new(b_offset, b_offset_y),
                 Color::WHITE,
             );
+            self.b_tx_rec.width = b_texture.width() as _;
+            self.b_tx_rec.height = b_texture.height() as _;
+            self.b_tx_rec.x = b_offset;
+            self.b_tx_rec.y = b_offset_y;
             drop(db);
             drop(d);
 
@@ -349,6 +411,28 @@ pub mod blocks {
                 },
             )
         }
+
+        fn on_hover(
+            &mut self,
+            pos: Vector2,
+            context: &mut control::ControlContext,
+        ) -> control::ControlResult {
+            if self.a_tx_rec.check_collision_point_rec(pos) {
+                self.a.on_hover(
+                    pos - Vector2::new(self.a_tx_rec.x, self.a_tx_rec.y),
+                    context,
+                );
+            }
+
+            if self.b_tx_rec.check_collision_point_rec(pos) {
+                self.b.on_hover(
+                    pos - Vector2::new(self.b_tx_rec.x, self.b_tx_rec.y),
+                    context,
+                );
+            }
+
+            control::ControlResult::Passthrough
+        }
     }
 
     impl<T> CanJoin for T {
@@ -359,7 +443,12 @@ pub mod blocks {
         where
             Self: Block<I1, Output = O1>,
         {
-            JoinedBlocks { a: self, b: other }
+            JoinedBlocks {
+                a: self,
+                b: other,
+                b_tx_rec: Default::default(),
+                a_tx_rec: Default::default(),
+            }
         }
     }
 
@@ -394,9 +483,13 @@ pub mod blocks {
             Self: Block<I1, Output = OC>;
     }
 
+    #[derive(Debug)]
     pub struct ConnectedBlocks<S1, S2> {
         input: S1,
         output: S2,
+
+        in_tx_rec: Rectangle,
+        out_tx_rec: Rectangle,
     }
 
     impl<S1, S2, I1, OC, O2> Block<I1> for ConnectedBlocks<S1, S2>
@@ -422,11 +515,25 @@ pub mod blocks {
             let ((a_texture, mut a_inputs, mut a_outputs), (b_texture, mut b_inputs, mut b_output)) =
                 match (in_txt, out_txt) {
                     (VisualizeResult::None, VisualizeResult::None) => {
-                        return ((out), VisualizeResult::None)
+                        self.in_tx_rec = Default::default();
+                        self.out_tx_rec = Default::default();
+                        return ((out), VisualizeResult::None);
                     }
-                    (VisualizeResult::None, VisualizeResult::SimpleTexture(x))
-                    | (VisualizeResult::SimpleTexture(x), VisualizeResult::None) => {
-                        return ((out), VisualizeResult::SimpleTexture(x))
+                    (VisualizeResult::None, VisualizeResult::SimpleTexture(x)) => {
+                        self.in_tx_rec = Default::default();
+                        self.out_tx_rec.width = x.width().abs() as _;
+                        self.out_tx_rec.height = x.height().abs() as _;
+                        self.out_tx_rec.x = 0f32;
+                        self.out_tx_rec.y = 0f32;
+                        return ((out), VisualizeResult::SimpleTexture(x));
+                    }
+                    (VisualizeResult::SimpleTexture(x), VisualizeResult::None) => {
+                        self.out_tx_rec = Default::default();
+                        self.in_tx_rec.width = x.width().abs() as _;
+                        self.in_tx_rec.height = x.height().abs() as _;
+                        self.in_tx_rec.x = 0f32;
+                        self.in_tx_rec.y = 0f32;
+                        return ((out), VisualizeResult::SimpleTexture(x));
                     }
                     (
                         VisualizeResult::None,
@@ -435,15 +542,12 @@ pub mod blocks {
                             input_connections,
                             output_connections,
                         },
-                    )
-                    | (
-                        VisualizeResult::Block {
-                            texture,
-                            input_connections,
-                            output_connections,
-                        },
-                        VisualizeResult::None,
                     ) => {
+                        self.in_tx_rec = Default::default();
+                        self.out_tx_rec.width = texture.width().abs() as _;
+                        self.out_tx_rec.height = texture.height().abs() as _;
+                        self.out_tx_rec.x = 0f32;
+                        self.out_tx_rec.y = 0f32;
                         return (
                             (out),
                             VisualizeResult::Block {
@@ -451,7 +555,29 @@ pub mod blocks {
                                 input_connections,
                                 output_connections,
                             },
-                        )
+                        );
+                    }
+                    (
+                        VisualizeResult::Block {
+                            texture,
+                            input_connections,
+                            output_connections,
+                        },
+                        VisualizeResult::None,
+                    ) => {
+                        self.out_tx_rec = Default::default();
+                        self.in_tx_rec.width = texture.width().abs() as _;
+                        self.in_tx_rec.height = texture.height().abs() as _;
+                        self.in_tx_rec.x = 0f32;
+                        self.in_tx_rec.y = 0f32;
+                        return (
+                            (out),
+                            VisualizeResult::Block {
+                                texture,
+                                input_connections,
+                                output_connections,
+                            },
+                        );
                     }
                     (VisualizeResult::SimpleTexture(a), VisualizeResult::SimpleTexture(b)) => {
                         ((a, vec![], vec![]), (b, vec![], vec![]))
@@ -500,7 +626,10 @@ pub mod blocks {
 
             let pad = vis::T * 10f32;
             let mut tx = context.get_texture((max_w as f32 + pad) as _, max_h as _);
-            tx.set_texture_filter(context.thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
+            tx.set_texture_filter(
+                context.thread,
+                raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X,
+            );
             let mut d = context.rl.begin_drawing(context.thread);
             let mut d = d.begin_texture_mode(context.thread, &mut tx);
             let mut db = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
@@ -516,6 +645,10 @@ pub mod blocks {
                 Vector2::new(0f32, a_offset),
                 Color::WHITE,
             );
+            self.in_tx_rec.width = a_texture.width() as _;
+            self.in_tx_rec.height = a_texture.height() as _;
+            self.in_tx_rec.x = 0f32;
+            self.in_tx_rec.y = a_offset;
             let b_txt_pos = Vector2::new(
                 (a_texture.width() as f32 + pad) as f32,
                 (((max_h as f32) - b_texture.height() as f32) / 2f32).trunc(),
@@ -530,6 +663,10 @@ pub mod blocks {
                 b_txt_pos,
                 Color::WHITE,
             );
+            self.out_tx_rec.width = b_texture.width() as _;
+            self.out_tx_rec.height = b_texture.height() as _;
+            self.out_tx_rec.x = b_txt_pos.x;
+            self.out_tx_rec.y = b_txt_pos.y;
 
             // draw connections
             assert_eq!(a_outputs.len(), b_inputs.len());
@@ -565,6 +702,28 @@ pub mod blocks {
                 },
             )
         }
+
+        fn on_hover(
+            &mut self,
+            pos: Vector2,
+            context: &mut control::ControlContext,
+        ) -> control::ControlResult {
+            if self.in_tx_rec.check_collision_point_rec(pos) {
+                self.input.on_hover(
+                    pos - Vector2::new(self.in_tx_rec.x, self.in_tx_rec.y),
+                    context,
+                );
+            }
+
+            if self.out_tx_rec.check_collision_point_rec(pos) {
+                self.output.on_hover(
+                    pos - Vector2::new(self.out_tx_rec.x, self.out_tx_rec.y),
+                    context,
+                );
+            }
+
+            control::ControlResult::Passthrough
+        }
     }
 
     impl<T> CanConnect for T {
@@ -578,6 +737,8 @@ pub mod blocks {
             ConnectedBlocks {
                 input: self,
                 output: other,
+                in_tx_rec: Default::default(),
+                out_tx_rec: Default::default(),
             }
         }
     }

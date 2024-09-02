@@ -1,9 +1,11 @@
 #![allow(non_upper_case_globals)]
 #![allow(dead_code)]
 
+use control::ControlContext;
 use dsp::Block;
 use raylib::prelude::*;
 use vis::DrawContext;
+pub mod control;
 pub mod dsp;
 pub mod setups;
 pub mod vis;
@@ -39,7 +41,13 @@ fn main() -> anyhow::Result<()> {
         zoom: 1.0,
     };
 
+    #[allow(unused_mut)]
+    let mut debug = format!("");
+
+    let sys_pos = Vector2::new(50.0, 100.0);
     while !rl.window_should_close() {
+        let mouse_pos = rl.get_mouse_position();
+        let mouse_world_pos = rl.get_screen_to_world2D(mouse_pos, cam);
         // zoom
         let wheel = rl.get_mouse_wheel_move();
         if wheel != 0.0 {
@@ -47,28 +55,44 @@ fn main() -> anyhow::Result<()> {
             cam.zoom += wheel as f32 * zoom_increment;
             cam.zoom = cam.zoom.max(0.1).min(3.0);
 
-            let mouse_pos = rl.get_mouse_position();
-            let mouse_world_pos = rl.get_screen_to_world2D(mouse_pos, cam);
             let delta = mouse_world_pos - cam.target;
             cam.target +=
                 delta * (1.0 - (1.0 / (cam.zoom / (cam.zoom + wheel as f32 * zoom_increment))));
         }
 
         // panning
+        let mouse_delta = rl.get_mouse_delta();
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_RIGHT) {
-            let delta = rl.get_mouse_delta().scale_by(-1.0 / cam.zoom);
+            let delta = mouse_delta.scale_by(-1.0 / cam.zoom);
             cam.target += delta;
         }
 
         cam.target.x = cam.target.x.trunc();
         cam.target.y = cam.target.y.trunc();
 
+        // interactive controls
+        if let Some(x) = texture.as_simple_texture() {
+            let tx_rec = Rectangle {
+                width: x.width() as _,
+                height: x.height() as _,
+                x: sys_pos.x,
+                y: sys_pos.y,
+            };
+
+            if tx_rec.check_collision_point_rec(mouse_world_pos) && mouse_delta.length() > 0f32 {
+                system.on_hover(mouse_world_pos - sys_pos, &mut ControlContext {});
+            }
+        }
+
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(vis::BG_COLOR);
         {
             let mut d = d.begin_mode2D(cam);
             if let Some(x) = texture.as_simple_texture() {
-                x.set_texture_filter(&thread, raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X);
+                x.set_texture_filter(
+                    &thread,
+                    raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X,
+                );
                 let mut d = d.begin_blend_mode(BlendMode::BLEND_ALPHA);
                 d.draw_texture_rec(
                     &x,
@@ -77,7 +101,7 @@ fn main() -> anyhow::Result<()> {
                         height: -x.height() as _,
                         ..Default::default()
                     },
-                    Vector2::new(50.0, 50.0),
+                    sys_pos,
                     Color::WHITE,
                 );
             }
@@ -85,6 +109,7 @@ fn main() -> anyhow::Result<()> {
 
         // Draw UI elements
         d.draw_text(&format!("Zoom: {:.2}", cam.zoom), 10, 10, 20, Color::WHITE);
+        d.draw_text(&format!("Debug: {}", &debug), 10, 30, 20, Color::WHITE);
     }
     Ok(())
 }
