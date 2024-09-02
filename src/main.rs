@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use control::ControlContext;
+use libloading::os::unix::RTLD_NOW;
 use raylib::prelude::*;
 use vis::{DrawContext, VisualizeResult};
 pub mod control;
@@ -11,19 +12,9 @@ pub mod vis;
 
 const W: i32 = 1080;
 const H: i32 = 720;
-
-fn load_setup(ctx: &mut DrawContext) -> anyhow::Result<VisualizeResult> {
-    unsafe {
-        let lib = libloading::Library::new("./target/debug/libdsp_blocks.so")?;
-
-        let func: libloading::Symbol<extern "C" fn(&mut DrawContext) -> VisualizeResult> =
-            lib.get(b"get_setup")?;
-        println!("lol {func:?}");
-        Ok(func(ctx))
-    }
-}
-
 fn main() -> anyhow::Result<()> {
+ 
+
     let (mut rl, thread) = raylib::init()
         .msaa_4x()
         .size(W, H)
@@ -34,9 +25,19 @@ fn main() -> anyhow::Result<()> {
         rl: &mut rl,
     };
 
-    println!("?");
-    let texture = load_setup(&mut draw_context)?;
+    let lib = unsafe {
+        libloading::os::unix::Library::open("./target/debug/libdsp_blocks.so".into(), RTLD_NOW)?
+    };
 
+    let load_setup = {
+        let func: libloading::os::unix::Symbol<extern "C" fn(&mut DrawContext) -> VisualizeResult> =
+            unsafe { lib.get(b"get_setup").unwrap() };
+        func
+    };
+
+    println!("?");
+
+    let texture = load_setup(&mut draw_context);
     rl.set_target_fps(60);
 
     let mut cam = Camera2D {
