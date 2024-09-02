@@ -203,7 +203,30 @@ impl Block<Wave> for AudioSink {
 }
 
 #[derive(Debug)]
-pub enum WaveView {
+pub struct WaveView {
+    pub t: WaveViewType,
+
+    pub is_hovering: bool,
+}
+
+impl WaveView {
+    pub fn grow() -> Self {
+        WaveView {
+            t: WaveViewType::Grow,
+            is_hovering: false,
+        }
+    }
+
+    pub fn small() -> Self {
+        WaveView {
+            t: WaveViewType::Small,
+            is_hovering: false,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum WaveViewType {
     Grow,
     Small,
 }
@@ -222,9 +245,9 @@ impl Block<Wave> for WaveView {
     ) -> (Self::Output, VisualizeResult) {
         let out = self.process(input);
 
-        let unit = 2f32 * BOX_SIZE;
-        let rec = match self {
-            WaveView::Grow => {
+        let unit = (if self.is_hovering { 10f32 } else { 2f32 }) * BOX_SIZE;
+        let rec = match self.t {
+            WaveViewType::Grow => {
                 // unit per SR
                 Rectangle {
                     width: ((out.len() / dsp::SR) + 1) as f32 * (unit * 2f32),
@@ -233,7 +256,7 @@ impl Block<Wave> for WaveView {
                     y: 0f32,
                 }
             }
-            WaveView::Small => {
+            WaveViewType::Small => {
                 // fit everything in unit
                 Rectangle {
                     width: unit,
@@ -263,5 +286,28 @@ impl Block<Wave> for WaveView {
                 output_connections: vec![Vector2::new(rec.width, rec.height / 2f32)],
             },
         )
+    }
+
+    fn on_hover(
+        &mut self,
+        _pos: Vector2,
+        context: &mut crate::control::ControlContext,
+    ) -> crate::control::ControlResult {
+        if !self.is_hovering {
+            self.is_hovering = true;
+            context.is_dirty = true;
+        }
+        crate::control::ControlResult::Passthrough
+    }
+
+    fn on_unhover(
+        &mut self,
+        context: &mut crate::control::ControlContext,
+    ) -> crate::control::ControlResult {
+        if self.is_hovering {
+            self.is_hovering = false;
+            context.is_dirty = true;
+        }
+        crate::control::ControlResult::Passthrough
     }
 }

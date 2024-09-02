@@ -22,15 +22,21 @@ fn main() -> anyhow::Result<()> {
 
     // select a system
     let (input, mut system) = setups::playground::create_playground_blocks()?;
+    let mut texture;
 
-    let (_, texture) = {
-        let mut draw_context = DrawContext {
-            thread: &thread,
-            rl: &mut rl,
-        };
+    macro_rules! redraw {
+        () => {{
+            let mut draw_context = DrawContext {
+                thread: &thread,
+                rl: &mut rl,
+            };
 
-        system.process_and_visualize(input.clone(), &mut draw_context)
-    };
+            let (_, t) = system.process_and_visualize(input.clone(), &mut draw_context);
+            texture = t;
+        }};
+    }
+
+    redraw!();
 
     rl.set_target_fps(60);
 
@@ -45,6 +51,8 @@ fn main() -> anyhow::Result<()> {
     let mut debug = format!("");
 
     let sys_pos = Vector2::new(50.0, 100.0);
+
+    let mut last_time_hover = false;
     while !rl.window_should_close() {
         let mouse_pos = rl.get_mouse_position();
         let mouse_world_pos = rl.get_screen_to_world2D(mouse_pos, cam);
@@ -71,6 +79,7 @@ fn main() -> anyhow::Result<()> {
         cam.target.y = cam.target.y.trunc();
 
         // interactive controls
+        let mut needs_total_redraw = false;
         if let Some(x) = texture.as_simple_texture() {
             let tx_rec = Rectangle {
                 width: x.width() as _,
@@ -78,10 +87,26 @@ fn main() -> anyhow::Result<()> {
                 x: sys_pos.x,
                 y: sys_pos.y,
             };
-
-            if tx_rec.check_collision_point_rec(mouse_world_pos) && mouse_delta.length() > 0f32 {
-                system.on_hover(mouse_world_pos - sys_pos, &mut ControlContext {});
+            let mut control_ctx = ControlContext {
+                thread: &thread,
+                rl: &mut rl,
+                is_dirty: false,
+            };
+            if tx_rec.check_collision_point_rec(mouse_world_pos) {
+                if mouse_delta.length() > 0f32 {
+                    system.on_hover(mouse_world_pos - sys_pos, &mut control_ctx);
+                    last_time_hover = true;
+                }
+            } else if last_time_hover {
+                system.on_unhover(&mut control_ctx);
+                last_time_hover = false;
             }
+            needs_total_redraw = control_ctx.is_dirty;
+        }
+
+        if needs_total_redraw {
+            println!("did redraw");
+            redraw!();
         }
 
         let mut d = rl.begin_drawing(&thread);

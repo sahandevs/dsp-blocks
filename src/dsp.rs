@@ -36,6 +36,11 @@ pub trait Block<Input>: Debug {
         let _ = pos;
         control::ControlResult::Passthrough
     }
+
+    fn on_unhover(&mut self, context: &mut control::ControlContext) -> control::ControlResult {
+        let _ = context;
+        control::ControlResult::Passthrough
+    }
 }
 
 pub mod signals {
@@ -422,6 +427,7 @@ pub mod blocks {
                     pos - Vector2::new(self.a_tx_rec.x, self.a_tx_rec.y),
                     context,
                 );
+                self.b.on_unhover(context);
             }
 
             if self.b_tx_rec.check_collision_point_rec(pos) {
@@ -429,8 +435,15 @@ pub mod blocks {
                     pos - Vector2::new(self.b_tx_rec.x, self.b_tx_rec.y),
                     context,
                 );
+                self.a.on_unhover(context);
             }
 
+            control::ControlResult::Passthrough
+        }
+
+        fn on_unhover(&mut self, context: &mut control::ControlContext) -> control::ControlResult {
+            self.a.on_unhover(context);
+            self.b.on_unhover(context);
             control::ControlResult::Passthrough
         }
     }
@@ -713,6 +726,7 @@ pub mod blocks {
                     pos - Vector2::new(self.in_tx_rec.x, self.in_tx_rec.y),
                     context,
                 );
+                self.output.on_unhover(context);
             }
 
             if self.out_tx_rec.check_collision_point_rec(pos) {
@@ -720,8 +734,15 @@ pub mod blocks {
                     pos - Vector2::new(self.out_tx_rec.x, self.out_tx_rec.y),
                     context,
                 );
+                self.input.on_unhover(context);
             }
 
+            control::ControlResult::Passthrough
+        }
+
+        fn on_unhover(&mut self, context: &mut control::ControlContext) -> control::ControlResult {
+            self.input.on_unhover(context);
+            self.output.on_unhover(context);
             control::ControlResult::Passthrough
         }
     }

@@ -13,13 +13,13 @@ type Input = (
 pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = ()>)> {
     let total_dur = Duration::from_millis(100);
     let sterio_sys = blocks::synths::Oscillator
-        .connect(vis::WaveView::Grow)
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::Grow))
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::Grow))
-        .connect(Basic::Mix.connect(vis::WaveView::Grow))
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::Grow))
+        .connect(vis::WaveView::grow())
+        .join(blocks::synths::Oscillator.connect(vis::WaveView::grow()))
+        .join(blocks::synths::Oscillator.connect(vis::WaveView::grow()))
+        .connect(Basic::Mix.connect(vis::WaveView::grow()))
+        .join(blocks::synths::Oscillator.connect(vis::WaveView::grow()))
         .connect(Basic::Mix)
-        .connect(vis::WaveView::Grow)
+        .connect(vis::WaveView::grow())
         // .connect(vis::AudioSink::try_default()?)
         .connect(blocks::Discard);
     let input = (
