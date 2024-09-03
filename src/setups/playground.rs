@@ -14,15 +14,17 @@ type Input = (
 pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = ()>)> {
     let total_dur = Duration::from_millis(230);
 
-    let envelope = blocks::EnvelopeBlock::default()
+    let envelope = vis::Identity
+        .connect(vis::Identity)
         .connect(vis::WaveView::small())
-        .join(
+        .stack(blocks::EnvelopeBlock::default().connect(vis::WaveView::small()))
+        .stack(
             blocks::EnvelopeBlock::builder()
                 .window(WindowSetting::builder().hop_length(1).build())
                 .build()
                 .connect(vis::WaveView::small()),
         )
-        .join(
+        .stack(
             blocks::EnvelopeBlock::builder()
                 .window(WindowSetting::builder().hop_length(128).build())
                 .build()
@@ -30,11 +32,12 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
         );
     let main = /* _ */
         blocks::synths::Oscillator.connect(vis::WaveView::small())
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::small()))
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::small()))
-        .join(blocks::synths::Oscillator.connect(vis::WaveView::small()))
-        .connect(Basic::Mix.connect(vis::WaveView::small()))
-        .fork(envelope);
+        .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
+        .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
+        .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
+        .connect(Basic::Mix)
+        .fork(envelope)
+        .connect(vis::WaveView::grow());
     let input = (
         (
             (

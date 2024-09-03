@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::dsp;
 use crate::dsp::Wave;
-use crate::graph::Block;
+use crate::graph::{Block, DInto};
 use raylib::prelude::*;
 use rodio::Source;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -12,6 +12,13 @@ pub const BORDER_COLOR: Color = Color::WHITE;
 pub const BG_COLOR: Color = Color::BLACK;
 pub const TEXT_COLOR: Color = Color::WHITE;
 pub const T: f32 = 3f32;
+
+pub const LINE_COLORS: [Color; 4] = [
+    Color::BLUEVIOLET,
+    Color::ROYALBLUE,
+    Color::ORANGE,
+    Color::BROWN,
+];
 
 pub struct DrawContext<'a, 'b> {
     pub thread: &'a RaylibThread,
@@ -36,6 +43,36 @@ pub enum VisualizeResult {
     },
 }
 
+#[derive(Debug)]
+pub struct Identity;
+impl<I> Block<I> for Identity {
+    type Output = I;
+
+    fn process(&mut self, input: I) -> Self::Output {
+        input
+    }
+
+    fn process_and_visualize(
+        &mut self,
+        input: I,
+        context: &mut DrawContext,
+    ) -> (Self::Output, VisualizeResult) {
+        let out = self.process(input);
+
+        let tx = context.get_texture(BOX_SIZE as _, BOX_SIZE as _);
+
+        let center = Vector2::new(BOX_SIZE, BOX_SIZE) / 2f32;
+        (
+            out,
+            VisualizeResult::Block {
+                texture: tx,
+                input_connections: vec![Vector2::new(center.x, center.y)],
+                output_connections: vec![Vector2::new(center.x, center.y)],
+            },
+        )
+    }
+}
+
 impl VisualizeResult {
     pub fn as_simple_texture(&self) -> Option<&RenderTexture2D> {
         match self {
@@ -54,7 +91,13 @@ pub fn draw_border(d: &mut impl RaylibDraw, rec: Rectangle) {
     d.draw_rectangle_lines_ex(rec, T / 1.5f32, Color::WHITE);
 }
 
-pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
+pub fn draw_wave(
+    d: &mut impl RaylibDraw,
+    rec: Rectangle,
+    wave_in: &[f32],
+    color: Color,
+    spacing: f32,
+) {
     let n = rec.width.trunc() as usize;
     let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
     let wave: Vec<f32> = wave_in.iter().step_by(step).take(n).cloned().collect();
@@ -65,22 +108,25 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
         .reduce(f32::max)
         .unwrap_or_default();
 
-    let spacing = rec.width / (n_samples + 1) as f32;
+    let spacing = if spacing == 0f32 {
+        rec.width / (n_samples + 1) as f32
+    } else {
+        spacing
+    };
 
     let center_y = (rec.y + rec.height / 2f32).trunc();
 
-    let mut offset = spacing;
+    let mut offset = spacing.trunc();
 
     let get_y = |sample: f32| (center_y - (sample / max) * (rec.height / 2.5f32)).trunc();
     let mut last_point = get_y(wave[0]);
     for sample in wave {
         let y = get_y(sample);
-        const COLOR: Color = Color::BLUEVIOLET;
         d.draw_line_ex(
             Vector2::new(rec.x + offset - spacing, last_point),
             Vector2::new(rec.x + offset, y),
             1f32,
-            COLOR,
+            color,
         );
         last_point = y;
         // d.draw_pixel((rec.x + offset) as _, y as _, Color::RED);
@@ -88,7 +134,13 @@ pub fn draw_wave(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
     }
 }
 
-pub fn draw_wave_box(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
+pub fn draw_wave_box(
+    d: &mut impl RaylibDraw,
+    rec: Rectangle,
+    wave_in: &[f32],
+    color: Color,
+    spacing: f32,
+) {
     // center line
     d.draw_line_ex(
         Vector2::new(0f32, (rec.height / 2f32).trunc()),
@@ -96,7 +148,7 @@ pub fn draw_wave_box(d: &mut impl RaylibDraw, rec: Rectangle, wave_in: &[f32]) {
         1f32,
         Color::GRAY,
     );
-    draw_wave(d, rec, wave_in);
+    draw_wave(d, rec, wave_in, color, spacing);
     draw_border(d, rec);
 }
 
@@ -203,7 +255,7 @@ impl Block<Wave> for AudioSink {
 }
 
 #[derive(Debug, tidy_builder::Builder)]
-pub struct WaveView {
+pub struct WaveView<const N: usize> {
     #[builder(value = default)]
     pub t: WaveViewType,
 
@@ -211,7 +263,7 @@ pub struct WaveView {
     pub is_hovering: bool,
 }
 
-impl WaveView {
+impl<const N: usize> WaveView<N> {
     pub fn grow() -> Self {
         WaveView::builder().t(WaveViewType::Grow).build()
     }
@@ -228,26 +280,29 @@ pub enum WaveViewType {
     Small,
 }
 
-impl Block<Wave> for WaveView {
-    type Output = Wave;
+impl<I: DInto<[Wave; N]>, const N: usize> Block<I> for WaveView<N> {
+    type Output = I;
 
-    fn process(&mut self, input: Wave) -> Self::Output {
+    fn process(&mut self, input: I) -> Self::Output {
         input
     }
 
     fn process_and_visualize(
         &mut self,
-        input: Wave,
+        input: I,
         context: &mut DrawContext,
     ) -> (Self::Output, VisualizeResult) {
-        let out = self.process(input);
+        let out: [Wave; N] = input.into();
 
         let unit = (if self.is_hovering { 10f32 } else { 2f32 }) * BOX_SIZE;
+
         let rec = match self.t {
             WaveViewType::Grow => {
                 // unit per SR
                 Rectangle {
-                    width: ((out.len() / dsp::SR) + 1) as f32 * (unit * 2f32),
+                    width: ((out.iter().map(|x| x.len()).max().unwrap_or_default() / dsp::SR) + 1)
+                        as f32
+                        * (unit * 2f32),
                     height: 50f32,
                     x: 0f32,
                     y: 0f32,
@@ -272,11 +327,26 @@ impl Block<Wave> for WaveView {
         let mut d = context.rl.begin_drawing(context.thread);
         let mut d = d.begin_texture_mode(context.thread, &mut tx);
 
-        draw_wave_box(&mut d, rec, &out);
+        for (i, wave) in out.iter().enumerate() {
+            d.draw_line_ex(
+                Vector2::new(0f32, (rec.height / 2f32).trunc()),
+                Vector2::new(rec.width, (rec.height / 2f32).trunc()),
+                1f32,
+                Color::GRAY,
+            );
+            draw_wave(
+                &mut d,
+                rec,
+                &wave,
+                LINE_COLORS[i],
+                if matches!(self.t,WaveViewType::Grow) { 0f32 } else { 1f32 },
+            );
+            draw_border(&mut d, rec);
+        }
 
         drop(d);
         (
-            out,
+            DInto::from(out),
             VisualizeResult::Block {
                 texture: tx,
                 input_connections: vec![Vector2::new(0f32, rec.height / 2f32)],

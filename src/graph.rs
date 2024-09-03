@@ -50,7 +50,7 @@ pub trait Block<Input>: Debug {
 }
 
 pub trait CanStack {
-    fn join<I1, I2, O1, O2, S: Block<I2, Output = O2>>(
+    fn stack<I1, I2, O1, O2, S: Block<I2, Output = O2>>(
         self,
         other: S,
     ) -> impl Block<(I1, I2), Output = (O1, O2)>
@@ -304,7 +304,7 @@ where
 }
 
 impl<T> CanStack for T {
-    fn join<I1, I2, O1, O2, S: Block<I2, Output = O2>>(
+    fn stack<I1, I2, O1, O2, S: Block<I2, Output = O2>>(
         self,
         other: S,
     ) -> impl Block<(I1, I2), Output = (O1, O2)>
@@ -320,25 +320,53 @@ impl<T> CanStack for T {
     }
 }
 
-pub trait IntoArray<T>: Sized {
+pub trait DInto<T>: Sized {
     fn into(self) -> T;
+    fn from(value: T) -> Self;
 }
 
-impl<T> IntoArray<[T; 2]> for (T, T) {
+impl<T> DInto<[T; 1]> for T {
+    fn into(self) -> [T; 1] {
+        [self]
+    }
+
+    fn from(value: [T; 1]) -> Self {
+        let [x] = value;
+        x
+    }
+}
+
+impl<T> DInto<[T; 2]> for (T, T) {
     fn into(self) -> [T; 2] {
         [self.0, self.1]
     }
+
+    fn from(value: [T; 2]) -> Self {
+        let [a, b] = value;
+        (a, b)
+    }
 }
-impl<T> IntoArray<[T; 3]> for ((T, T), T) {
+
+impl<T> DInto<[T; 3]> for ((T, T), T) {
     fn into(self) -> [T; 3] {
         let ((a, b), c) = self;
         [a, b, c]
     }
+    fn from(value: [T; 3]) -> Self {
+        let [a, b, c] = value;
+        ((a, b), c)
+    }
 }
-impl<T> IntoArray<[T; 4]> for (((T, T), T), T) {
+
+impl<T> DInto<[T; 4]> for (((T, T), T), T) {
     fn into(self) -> [T; 4] {
         let (((a, b), c), d) = self;
         [a, b, c, d]
+    }
+
+    fn from(value: [T; 4]) -> Self {
+        let [a, b, c, d] = value;
+        (((a, b), c), d)
     }
 }
 
@@ -358,6 +386,8 @@ pub struct ConnectedBlocks<S1, S2> {
 
     in_tx_rec: Rectangle,
     out_tx_rec: Rectangle,
+
+    colored: bool,
 }
 
 impl<S1, S2, I1, OC, O2> Block<I1> for ConnectedBlocks<S1, S2>
@@ -493,6 +523,10 @@ where
             a_outputs.extend(a_outputs.repeat(b_inputs.len() - 1));
         }
 
+        if b_inputs.len() == 1 && a_outputs.len() > 1 {
+            b_inputs.extend(b_inputs.repeat(a_outputs.len() - 1));
+        }
+
         let max_w = a_texture.width() + b_texture.width();
         let max_h = a_texture.height().max(b_texture.height());
 
@@ -550,8 +584,17 @@ where
             *b += b_txt_pos;
         }
 
-        for (a, b) in a_outputs.iter().zip(b_inputs.iter()) {
-            db.draw_line_bezier(a, b, 1f32, vis::BORDER_COLOR);
+        for (i, (a, b)) in a_outputs.iter().zip(b_inputs.iter()).enumerate() {
+            db.draw_line_bezier(
+                a,
+                b,
+                1f32,
+                if self.colored {
+                    vis::LINE_COLORS[i]
+                } else {
+                    vis::BORDER_COLOR
+                },
+            );
         }
 
         drop(db);
@@ -619,7 +662,15 @@ impl<T> CanConnect for T {
             output: other,
             in_tx_rec: Default::default(),
             out_tx_rec: Default::default(),
+            colored: false,
         }
+    }
+}
+
+impl<S1, S2> ConnectedBlocks<S1, S2> {
+    pub fn colored(mut self) -> Self {
+        self.colored = true;
+        self
     }
 }
 
@@ -693,7 +744,7 @@ pub trait CanFork {
     where
         Self: Block<I, Output = IA>,
         S: Block<IF, Output = (OA, OB)>,
-        IA: Duplicate<IF>;
+        IA: DInto2<IF>;
 }
 
 impl<T> CanFork for T {
@@ -701,10 +752,10 @@ impl<T> CanFork for T {
     where
         Self: Block<I, Output = IA>,
         S: Block<IF, Output = (OA, OB)>,
-        IA: Duplicate<IF>,
+        IA: DInto2<IF>,
     {
         self.connect(MapperBlock {
-            mapper: |i: IA| i.duplicate(),
+            mapper: |i: IA| i.into(),
             name: "Fork".to_string(),
             no_vis: true,
         })
@@ -712,24 +763,25 @@ impl<T> CanFork for T {
     }
 }
 
-pub trait Duplicate<T>: Sized {
-    fn duplicate(self) -> T;
+// to avoid trait impl conflict :(
+pub trait DInto2<T> {
+    fn into(self) -> T;
 }
 
-impl<T: Clone> Duplicate<(T, T)> for T {
-    fn duplicate(self) -> (T, T) {
+impl<T: Clone> DInto2<(T, T)> for T {
+    fn into(self) -> (T, T) {
         (self.clone(), self)
     }
 }
 
-impl<T: Clone> Duplicate<((T, T), T)> for T {
-    fn duplicate(self) -> ((T, T), T) {
+impl<T: Clone> DInto2<((T, T), T)> for T {
+    fn into(self) -> ((T, T), T) {
         ((self.clone(), self.clone()), self)
     }
 }
 
-impl<T: Clone> Duplicate<(((T, T), T), T)> for T {
-    fn duplicate(self) -> (((T, T), T), T) {
+impl<T: Clone> DInto2<(((T, T), T), T)> for T {
+    fn into(self) -> (((T, T), T), T) {
         (((self.clone(), self.clone()), self.clone()), self)
     }
 }

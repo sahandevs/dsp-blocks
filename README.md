@@ -1,8 +1,12 @@
 # DSP Blocks
+
 my DSP playground
+
+<center>
 
 ![demo](./demo.png)
 
+</center>
 
 # Todo List
 
@@ -16,7 +20,7 @@ my DSP playground
   - [ ] Implement them using fourier approximation
 - [ ] Create interactive controls for frequency, amplitude, and phase
 - [ ] Implement signal addition, multiplication, and scaling
-- [ ] [Visualize envelope detection](https://youtu.be/rlypsap6Wow?list=PL-wATfeyAMNqIee7cH3q1bh4QJFAaeNv0&t=995)
+- [x] [Visualize envelope detection](https://youtu.be/rlypsap6Wow?list=PL-wATfeyAMNqIee7cH3q1bh4QJFAaeNv0&t=995)
 - [ ] Implement Discrete Fourier Transform (DFT) from scratch
 - [ ] Visualize frequency spectrum
 - [ ] Compare your DFT with numpy's FFT
@@ -113,3 +117,7 @@ my DSP playground
 ### Synthesis
 
 - [ ] [Analytic pluck synthesis](https://signalsmith-audio.co.uk/writing/2021/analytic-pluck/)
+
+### Visualization Stuff
+
+- [ ] Implement a better colored connections

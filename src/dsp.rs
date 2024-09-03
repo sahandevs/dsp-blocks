@@ -25,7 +25,7 @@ pub mod signals {
 pub mod blocks {
 
     use crate::{
-        graph::{Block, IntoArray},
+        graph::{Block, DInto},
         vis,
     };
 
@@ -104,7 +104,7 @@ pub mod blocks {
         Diff,
     }
 
-    impl<T: IntoArray<[Wave; N]>, const N: usize> Block<T> for Basic<N> {
+    impl<T: DInto<[Wave; N]>, const N: usize> Block<T> for Basic<N> {
         type Output = Wave;
 
         fn process(&mut self, input: T) -> Self::Output {
