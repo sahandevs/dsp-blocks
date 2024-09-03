@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use crate::dsp;
-use crate::dsp::Block;
 use crate::dsp::Wave;
+use crate::graph::Block;
 use raylib::prelude::*;
 use rodio::Source;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -285,26 +285,26 @@ impl Block<Wave> for WaveView {
         )
     }
 
-    fn on_hover(
-        &mut self,
-        _pos: Vector2,
-        context: &mut crate::control::ControlContext,
-    ) -> crate::control::ControlResult {
-        if !self.is_hovering {
-            self.is_hovering = true;
-            context.is_dirty = true;
-        }
-        crate::control::ControlResult::Passthrough
-    }
+    // fn on_hover(
+    //     &mut self,
+    //     _pos: Vector2,
+    //     context: &mut crate::control::ControlContext,
+    // ) -> crate::control::ControlResult {
+    //     if !self.is_hovering {
+    //         self.is_hovering = true;
+    //         context.is_dirty = true;
+    //     }
+    //     crate::control::ControlResult::Passthrough
+    // }
 
-    fn on_unhover(
-        &mut self,
-        context: &mut crate::control::ControlContext,
-    ) -> crate::control::ControlResult {
-        if self.is_hovering {
-            self.is_hovering = false;
-            context.is_dirty = true;
-        }
-        crate::control::ControlResult::Passthrough
-    }
+    // fn on_unhover(
+    //     &mut self,
+    //     context: &mut crate::control::ControlContext,
+    // ) -> crate::control::ControlResult {
+    //     if self.is_hovering {
+    //         self.is_hovering = false;
+    //         context.is_dirty = true;
+    //     }
+    //     crate::control::ControlResult::Passthrough
+    // }
 }

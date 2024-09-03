@@ -3,7 +3,8 @@ use std::time::Duration;
 use synths::OscillatorControls;
 
 use crate::dsp::blocks::*;
-use crate::vis;
+use crate::graph::{Block, CanConnect, CanStack};
+use crate::{graph, vis};
 
 type Input = (
     ((OscillatorControls, OscillatorControls), OscillatorControls),
@@ -22,7 +23,7 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
         .connect(Basic::Amp)
         .connect(vis::WaveView::grow())
         // .connect(vis::AudioSink::try_default()?)
-        .connect(blocks::Discard);
+        .connect(graph::Discard);
     let input = (
         (
             (

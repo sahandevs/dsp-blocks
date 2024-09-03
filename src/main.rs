@@ -4,11 +4,12 @@
 use std::env;
 
 use control::ControlContext;
-use dsp::Block;
+use graph::Block;
 use raylib::prelude::*;
 use vis::DrawContext;
 pub mod control;
 pub mod dsp;
+pub mod graph;
 pub mod setups;
 pub mod vis;
 
