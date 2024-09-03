@@ -174,4 +174,77 @@ pub mod blocks {
             )
         }
     }
+
+    #[derive(Debug, tidy_builder::Builder)]
+    pub struct WindowSetting {
+        #[builder(value = 1024)]
+        frame_size: usize,
+        #[builder(value = 512)]
+        hop_length: usize,
+    }
+
+    impl Default for WindowSetting {
+        fn default() -> Self {
+            Self::builder().build()
+        }
+    }
+
+    #[derive(Debug, Default)]
+    pub enum EnvelopeType {
+        #[default]
+        Amp,
+    }
+
+    #[derive(Debug, tidy_builder::Builder)]
+    pub struct EnvelopeBlock {
+        #[builder(value = default)]
+        pub t: EnvelopeType,
+        #[builder(value = default)]
+        pub window: WindowSetting,
+    }
+
+    impl Default for EnvelopeBlock {
+        fn default() -> Self {
+            Self::builder().build()
+        }
+    }
+
+    impl Block<Wave> for EnvelopeBlock {
+        type Output = Wave;
+
+        fn process(&mut self, input: Wave) -> Self::Output {
+            // shape of output depands on the hop_length
+            let mut out =
+                vec![0f32; (input.len() as f32 / self.window.hop_length as f32).ceil() as usize];
+
+            let mut w_start = 0;
+            for slot in out.iter_mut() {
+                let frame =
+                    &input[w_start..(self.window.frame_size + w_start).min(input.len() - 1)];
+                match self.t {
+                    EnvelopeType::Amp => {
+                        *slot = frame.iter().copied().reduce(f32::max).unwrap_or_default();
+                    }
+                }
+                w_start += self.window.hop_length;
+            }
+            out
+        }
+
+        fn process_and_visualize(
+            &mut self,
+            input: Wave,
+            context: &mut DrawContext,
+        ) -> (Self::Output, VisualizeResult) {
+            let out = self.process(input);
+            vis::visualize_simple_box(
+                context,
+                &format!(
+                    "Envelope\n{:?}\n{},{}",
+                    self.t, self.window.frame_size, self.window.hop_length
+                ),
+                out,
+            )
+        }
+    }
 }

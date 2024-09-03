@@ -489,6 +489,10 @@ where
                 ),
             };
 
+        if a_outputs.len() == 1 && b_inputs.len() > 1 {
+            a_outputs.extend(a_outputs.repeat(b_inputs.len() - 1));
+        }
+
         let max_w = a_texture.width() + b_texture.width();
         let max_h = a_texture.height().max(b_texture.height());
 
@@ -616,5 +620,77 @@ impl<T> CanConnect for T {
             in_tx_rec: Default::default(),
             out_tx_rec: Default::default(),
         }
+    }
+}
+
+pub struct MapperBlock<M> {
+    mapper: M,
+    name: String,
+}
+
+impl<M> Debug for MapperBlock<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MapperBlock")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+impl<I, O, M> Block<I> for MapperBlock<M>
+where
+    M: Fn(I) -> O,
+{
+    type Output = O;
+
+    fn process(&mut self, input: I) -> Self::Output {
+        (self.mapper)(input)
+    }
+
+    fn process_and_visualize(
+        &mut self,
+        input: I,
+        context: &mut DrawContext,
+    ) -> (Self::Output, VisualizeResult) {
+        let out = self.process(input);
+        vis::visualize_simple_box(context, &self.name, out)
+    }
+}
+
+pub trait CanMap {
+    fn map<M, I, O, OM>(self, name: impl Into<String>, mapper: M) -> impl Block<I, Output = OM>
+    where
+        Self: Block<I, Output = O>,
+        M: Fn(O) -> OM;
+}
+
+impl<T> CanMap for T {
+    fn map<M, I, O, OM>(self, name: impl Into<String>, mapper: M) -> impl Block<I, Output = OM>
+    where
+        Self: Block<I, Output = O>,
+        M: Fn(O) -> OM,
+    {
+        self.connect(MapperBlock {
+            mapper,
+            name: name.into(),
+        })
+    }
+}
+
+pub trait CanFork {
+    fn fork<I, IF, OA, OB, S>(self, other: S) -> impl Block<I, Output = (OA, OB)>
+    where
+        Self: Block<I, Output = IF>,
+        S: Block<(IF, IF), Output = (OA, OB)>,
+        IF: Clone;
+}
+
+impl<T> CanFork for T {
+    fn fork<I, IF, OA, OB, S>(self, other: S) -> impl Block<I, Output = (OA, OB)>
+    where
+        Self: Block<I, Output = IF>,
+        S: Block<(IF, IF), Output = (OA, OB)>,
+        IF: Clone,
+    {
+        self.map("Fork", |i| (i.clone(), i)).connect(other)
     }
 }
