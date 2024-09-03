@@ -217,7 +217,7 @@ pub mod blocks {
         }
     }
 
-    pub trait CanJoin {
+    pub trait CanStack {
         fn join<I1, I2, O1, O2, S: Block<I2, Output = O2>>(
             self,
             other: S,
@@ -227,7 +227,7 @@ pub mod blocks {
     }
 
     #[derive(Debug)]
-    pub struct JoinedBlocks<S1, S2> {
+    pub struct StackedBlocks<S1, S2> {
         a: S1,
         b: S2,
 
@@ -235,7 +235,7 @@ pub mod blocks {
         b_tx_rec: Rectangle,
     }
 
-    impl<S1, S2, I1, I2, O1, O2> Block<(I1, I2)> for JoinedBlocks<S1, S2>
+    impl<S1, S2, I1, I2, O1, O2> Block<(I1, I2)> for StackedBlocks<S1, S2>
     where
         S1: Block<I1, Output = O1>,
         S2: Block<I2, Output = O2>,
@@ -471,7 +471,7 @@ pub mod blocks {
         }
     }
 
-    impl<T> CanJoin for T {
+    impl<T> CanStack for T {
         fn join<I1, I2, O1, O2, S: Block<I2, Output = O2>>(
             self,
             other: S,
@@ -479,7 +479,7 @@ pub mod blocks {
         where
             Self: Block<I1, Output = O1>,
         {
-            JoinedBlocks {
+            StackedBlocks {
                 a: self,
                 b: other,
                 b_tx_rec: Default::default(),
