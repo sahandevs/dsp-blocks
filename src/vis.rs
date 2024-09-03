@@ -202,32 +202,29 @@ impl Block<Wave> for AudioSink {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, tidy_builder::Builder)]
 pub struct WaveView {
+    #[builder(value = default)]
     pub t: WaveViewType,
 
+    #[builder(value = false)]
     pub is_hovering: bool,
 }
 
 impl WaveView {
     pub fn grow() -> Self {
-        WaveView {
-            t: WaveViewType::Grow,
-            is_hovering: false,
-        }
+        WaveView::builder().t(WaveViewType::Grow).build()
     }
 
     pub fn small() -> Self {
-        WaveView {
-            t: WaveViewType::Small,
-            is_hovering: false,
-        }
+        WaveView::builder().t(WaveViewType::Small).build()
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum WaveViewType {
     Grow,
+    #[default]
     Small,
 }
 
