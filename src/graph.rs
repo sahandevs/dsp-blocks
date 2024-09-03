@@ -626,6 +626,7 @@ impl<T> CanConnect for T {
 pub struct MapperBlock<M> {
     mapper: M,
     name: String,
+    no_vis: bool,
 }
 
 impl<M> Debug for MapperBlock<M> {
@@ -633,6 +634,13 @@ impl<M> Debug for MapperBlock<M> {
         f.debug_struct("MapperBlock")
             .field("name", &self.name)
             .finish()
+    }
+}
+
+impl<M> MapperBlock<M> {
+    pub fn no_vis(mut self) -> Self {
+        self.no_vis = true;
+        self
     }
 }
 
@@ -652,6 +660,9 @@ where
         context: &mut DrawContext,
     ) -> (Self::Output, VisualizeResult) {
         let out = self.process(input);
+        if self.no_vis {
+            return (out, VisualizeResult::None);
+        }
         vis::visualize_simple_box(context, &self.name, out)
     }
 }
@@ -672,25 +683,53 @@ impl<T> CanMap for T {
         self.connect(MapperBlock {
             mapper,
             name: name.into(),
+            no_vis: false,
         })
     }
 }
 
 pub trait CanFork {
-    fn fork<I, IF, OA, OB, S>(self, other: S) -> impl Block<I, Output = (OA, OB)>
+    fn fork<I, IA, IF, OA, OB, S>(self, other: S) -> impl Block<I, Output = (OA, OB)>
     where
-        Self: Block<I, Output = IF>,
-        S: Block<(IF, IF), Output = (OA, OB)>,
-        IF: Clone;
+        Self: Block<I, Output = IA>,
+        S: Block<IF, Output = (OA, OB)>,
+        IA: Duplicate<IF>;
 }
 
 impl<T> CanFork for T {
-    fn fork<I, IF, OA, OB, S>(self, other: S) -> impl Block<I, Output = (OA, OB)>
+    fn fork<I, IA, IF, OA, OB, S>(self, other: S) -> impl Block<I, Output = (OA, OB)>
     where
-        Self: Block<I, Output = IF>,
-        S: Block<(IF, IF), Output = (OA, OB)>,
-        IF: Clone,
+        Self: Block<I, Output = IA>,
+        S: Block<IF, Output = (OA, OB)>,
+        IA: Duplicate<IF>,
     {
-        self.map("Fork", |i| (i.clone(), i)).connect(other)
+        self.connect(MapperBlock {
+            mapper: |i: IA| i.duplicate(),
+            name: "Fork".to_string(),
+            no_vis: true,
+        })
+        .connect(other)
+    }
+}
+
+pub trait Duplicate<T>: Sized {
+    fn duplicate(self) -> T;
+}
+
+impl<T: Clone> Duplicate<(T, T)> for T {
+    fn duplicate(self) -> (T, T) {
+        (self.clone(), self)
+    }
+}
+
+impl<T: Clone> Duplicate<((T, T), T)> for T {
+    fn duplicate(self) -> ((T, T), T) {
+        ((self.clone(), self.clone()), self)
+    }
+}
+
+impl<T: Clone> Duplicate<(((T, T), T), T)> for T {
+    fn duplicate(self) -> (((T, T), T), T) {
+        (((self.clone(), self.clone()), self.clone()), self)
     }
 }

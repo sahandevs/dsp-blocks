@@ -13,18 +13,28 @@ type Input = (
 
 pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = ()>)> {
     let total_dur = Duration::from_millis(230);
-    let sterio_sys = /* _ */
+
+    let envelope = blocks::EnvelopeBlock::default()
+        .connect(vis::WaveView::small())
+        .join(
+            blocks::EnvelopeBlock::builder()
+                .window(WindowSetting::builder().hop_length(1).build())
+                .build()
+                .connect(vis::WaveView::small()),
+        )
+        .join(
+            blocks::EnvelopeBlock::builder()
+                .window(WindowSetting::builder().hop_length(128).build())
+                .build()
+                .connect(vis::WaveView::small()),
+        );
+    let main = /* _ */
         blocks::synths::Oscillator.connect(vis::WaveView::small())
         .join(blocks::synths::Oscillator.connect(vis::WaveView::small()))
         .join(blocks::synths::Oscillator.connect(vis::WaveView::small()))
         .join(blocks::synths::Oscillator.connect(vis::WaveView::small()))
         .connect(Basic::Mix.connect(vis::WaveView::small()))
-        .fork(
-            blocks::EnvelopeBlock::default().connect(vis::WaveView::small())
-            .join(blocks::EnvelopeBlock::builder().window(WindowSetting::builder().hop_length(1).build()).build().connect(vis::WaveView::small()))
-        )
-        // .connect(vis::AudioSink::try_default()?)
-        .connect(graph::Discard);
+        .fork(envelope);
     let input = (
         (
             (
@@ -56,5 +66,10 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
         },
     );
 
-    Ok((input, sterio_sys))
+    Ok((
+        input,
+        main
+            // .connect(vis::AudioSink::try_default()?)
+            .connect(graph::Discard),
+    ))
 }
