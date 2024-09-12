@@ -101,6 +101,7 @@ pub fn draw_wave(
     let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
 
     // Max-pooling downsampling
+    // TODO: maybe most-diff pooling results are better?
     let wave: Vec<f32> = (0..n)
         .map(|i| {
             let start = i * step;
@@ -123,6 +124,7 @@ pub fn draw_wave(
         .collect();
 
     let n_samples = wave.len();
+
     let max = wave
         .iter()
         .map(|x| x.abs())
@@ -138,6 +140,26 @@ pub fn draw_wave(
     let center_y = (rec.y + rec.height / 2f32).trunc();
 
     let mut offset = spacing.trunc();
+
+    // draw y guide lines.
+    if max.trunc() > 1f32 {
+        let p_guideline = rec.height / max;
+
+        for i in 0..max.abs() as usize {
+            d.draw_line_ex(
+                Vector2::new(0f32, center_y + p_guideline * i as f32),
+                Vector2::new(rec.width, center_y + p_guideline * i as f32),
+                1f32,
+                Color::GRAY,
+            );
+            d.draw_line_ex(
+                Vector2::new(0f32, center_y - p_guideline * i as f32),
+                Vector2::new(rec.width, center_y - p_guideline * i as f32),
+                1f32,
+                Color::GRAY,
+            );
+        }
+    }
 
     let get_y = |sample: f32| (center_y - (sample / max) * (rec.height / 2.5f32)).trunc();
     let mut last_point = get_y(wave[0]);
@@ -179,7 +201,7 @@ pub fn draw_wave_box(
         Vector2::new(0f32, (rec.height / 2f32).trunc()),
         Vector2::new(rec.width, (rec.height / 2f32).trunc()),
         1f32,
-        Color::GRAY,
+        Color::SILVER,
     );
     draw_wave(d, rec, wave_in, color, spacing);
     draw_border(d, rec);
