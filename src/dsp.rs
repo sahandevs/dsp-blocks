@@ -33,9 +33,66 @@ pub mod blocks {
 
     pub mod synths {
 
+        use std::time::Duration;
+
         use crate::{graph::Block, vis};
 
         pub use super::*;
+
+        /// https://tttapa.github.io/Pages/Mathematics/Systems-and-Control-Theory/Digital-filters/DTLTI-Systems,-Transfer-Functions,-and-the-Z-transform/Impulse-and-Step-Response.html#the-kronecker-delta-function
+        #[derive(Debug)]
+        pub enum KroneckerDelta {
+            Start,
+            Center,
+            End,
+        }
+
+        impl Block<Duration> for KroneckerDelta {
+            type Output = Wave;
+
+            fn process(&mut self, duration: Duration) -> Self::Output {
+                let num_samples = (SR as f32 * duration.as_secs_f32()) as usize;
+                let mut wave = vec![0f32; num_samples];
+                match self {
+                    KroneckerDelta::Start => wave[0] = 1f32,
+                    KroneckerDelta::Center => wave[num_samples / 2] = 1f32,
+                    KroneckerDelta::End => wave[num_samples - 1] = 1f32,
+                }
+                wave
+            }
+
+            fn process_and_visualize(
+                &mut self,
+                dur: Duration,
+                context: &mut DrawContext,
+            ) -> (Self::Output, VisualizeResult) {
+                let out = self.process(dur.clone());
+                vis::visualize_simple_box(context, &format!("Delta\n{self:?}"), out)
+            }
+        }
+
+        /// https://tttapa.github.io/Pages/Mathematics/Systems-and-Control-Theory/Digital-filters/DTLTI-Systems,-Transfer-Functions,-and-the-Z-transform/Impulse-and-Step-Response.html#the-heaviside-step-function
+        #[derive(Debug)]
+        pub struct HeavisideStep;
+
+        impl Block<Duration> for HeavisideStep {
+            type Output = Wave;
+
+            fn process(&mut self, duration: Duration) -> Self::Output {
+                let num_samples = (SR as f32 * duration.as_secs_f32()) as usize;
+                let wave = vec![1f32; num_samples];
+                wave
+            }
+
+            fn process_and_visualize(
+                &mut self,
+                dur: Duration,
+                context: &mut DrawContext,
+            ) -> (Self::Output, VisualizeResult) {
+                let out = self.process(dur.clone());
+                vis::visualize_simple_box(context, &format!("Step"), out)
+            }
+        }
 
         #[derive(Debug)]
         pub struct Oscillator;
@@ -98,6 +155,50 @@ pub mod blocks {
     }
 
     #[derive(Debug)]
+    pub enum AutoPad<const N: usize> {
+        Start,
+        End,
+    }
+
+    impl<I: DInto<[Wave; N]>, const N: usize> Block<I> for AutoPad<N> {
+        type Output = I;
+
+        fn process(&mut self, input: I) -> Self::Output {
+            let mut waves: [Wave; N] = input.into();
+
+            let max_len = waves.iter().map(|x| x.len()).max().unwrap_or_default();
+
+            let mut out: [Wave; N] = core::array::from_fn(|_| Vec::with_capacity(0));
+            for i in 0..N {
+                let wil = waves[i].len();
+                if wil < max_len {
+                    match self {
+                        AutoPad::Start => {
+                            let mut w = vec![0f32; max_len];
+                            w[max_len - wil..].copy_from_slice(&waves[i]);
+                            waves[i] = w;
+                        }
+                        AutoPad::End => {
+                            waves[i].extend([0f32].repeat(max_len - wil));
+                        }
+                    }
+                }
+                std::mem::swap(&mut out[i], &mut waves[i]);
+            }
+
+            DInto::from(out)
+        }
+        fn process_and_visualize(
+            &mut self,
+            input: I,
+            context: &mut DrawContext,
+        ) -> (Self::Output, VisualizeResult) {
+            let out = self.process(input);
+            vis::visualize_simple_box(context, &format!("Autopad\n{self:?}"), out)
+        }
+    }
+
+    #[derive(Debug)]
     pub enum Basic<const N: usize> {
         Mix,
         Amp,
@@ -112,7 +213,8 @@ pub mod blocks {
             let len = input[0].len();
             assert!(
                 input.iter().all(|wave| wave.len() == len),
-                "All input waves must have the same length"
+                "All input waves must have the same length {:?}",
+                input.iter().map(|x| x.len()).collect::<Vec<_>>()
             );
 
             match self {

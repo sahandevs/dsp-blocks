@@ -4,14 +4,18 @@ use synths::OscillatorControls;
 
 use crate::dsp::blocks::*;
 use crate::graph::{Block, CanConnect, CanFork, CanStack, MetadataExt};
+use crate::vis::{Identity, WaveView};
 use crate::{graph, vis};
 
-type Input = (
+type Input1 = (
     ((OscillatorControls, OscillatorControls), OscillatorControls),
     OscillatorControls,
 );
 
-pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Output = ()>)> {
+type Input2 = (((Duration, Duration), Duration), Duration);
+
+pub fn create_playground_blocks(
+) -> anyhow::Result<((Input1, Input2), impl Block<(Input1, Input2), Output = ()>)> {
     let total_dur = Duration::from_millis(230);
 
     let envelope = vis::Identity
@@ -30,7 +34,7 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
                 .build()
                 .connect(vis::WaveView::small()),
         );
-    let main = /* _ */
+    let sys_1 = /* _ */
         blocks::synths::Oscillator.connect(vis::WaveView::small())
         .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
         .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
@@ -39,7 +43,7 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
         .fork(envelope)
         .connect(vis::WaveView::grow())
         .colored();
-    let input = (
+    let input_sys_1 = (
         (
             (
                 synths::OscillatorControls {
@@ -70,10 +74,32 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
         },
     );
 
-    Ok((
-        input,
-        main
-            // .connect(vis::AudioSink::try_default()?)
-            .connect(graph::Discard),
-    ))
+    let sys_2 = blocks::synths::KroneckerDelta::End
+        .stack(blocks::synths::KroneckerDelta::Center)
+        .stack(blocks::synths::KroneckerDelta::Start)
+        .connect(blocks::Basic::Mix)
+        .connect(WaveView::small())
+        .fork(
+            blocks::EnvelopeBlock::builder()
+                .window(WindowSetting::builder().hop_length(1).build())
+                .build()
+                .connect(vis::WaveView::small())
+                .stack(Identity),
+        )
+        .stack(blocks::synths::HeavisideStep.connect(WaveView::small()))
+        .connect(AutoPad::Start)
+        .connect(blocks::Basic::Mix)
+        .connect(WaveView::small());
+
+    let input_sys_2 = (
+        ((total_dur.clone(), total_dur.clone()), total_dur.clone()),
+        total_dur / 8,
+    );
+
+    let out_sys = sys_1
+        .stack(sys_2)
+        // .connect(vis::AudioSink::try_default()?)
+        .connect(graph::Discard);
+
+    Ok(((input_sys_1, input_sys_2), out_sys))
 }

@@ -90,7 +90,6 @@ impl VisualizeResult {
 pub fn draw_border(d: &mut impl RaylibDraw, rec: Rectangle) {
     d.draw_rectangle_lines_ex(rec, T / 1.5f32, Color::WHITE);
 }
-
 pub fn draw_wave(
     d: &mut impl RaylibDraw,
     rec: Rectangle,
@@ -100,7 +99,29 @@ pub fn draw_wave(
 ) {
     let n = rec.width.trunc() as usize;
     let step = (wave_in.len() as f64 / n as f64).ceil() as usize;
-    let wave: Vec<f32> = wave_in.iter().step_by(step).take(n).cloned().collect();
+
+    // Max-pooling downsampling
+    let wave: Vec<f32> = (0..n)
+        .map(|i| {
+            let start = i * step;
+            let end = (start + step).min(wave_in.len());
+            if start < end {
+                wave_in[start..end].iter().fold(
+                    0f32,
+                    |max, &x| {
+                        if max.abs() > x.abs() {
+                            max
+                        } else {
+                            x
+                        }
+                    },
+                )
+            } else {
+                0f32 // slice is empty
+            }
+        })
+        .collect();
+
     let n_samples = wave.len();
     let max = wave
         .iter()
@@ -122,14 +143,26 @@ pub fn draw_wave(
     let mut last_point = get_y(wave[0]);
     for sample in wave {
         let y = get_y(sample);
+
+        // vertical lines
+        if false {
+            d.draw_line_ex(
+                Vector2::new(rec.x + offset, center_y),
+                Vector2::new(rec.x + offset, y),
+                1f32,
+                color,
+            );
+        }
+
+        // Draw connecting line
         d.draw_line_ex(
             Vector2::new(rec.x + offset - spacing, last_point),
             Vector2::new(rec.x + offset, y),
             1f32,
             color,
         );
+
         last_point = y;
-        // d.draw_pixel((rec.x + offset) as _, y as _, Color::RED);
         offset += spacing;
     }
 }
@@ -334,12 +367,23 @@ impl<I: DInto<[Wave; N]>, const N: usize> Block<I> for WaveView<N> {
                 1f32,
                 Color::GRAY,
             );
+
+            let inner_box = Rectangle {
+                width: rec.width - 10f32,
+                height: rec.height,
+                x: 5f32,
+                y: 0f32,
+            };
             draw_wave(
                 &mut d,
-                rec,
+                inner_box,
                 &wave,
                 LINE_COLORS[i],
-                if matches!(self.t,WaveViewType::Grow) { 0f32 } else { 1f32 },
+                if matches!(self.t, WaveViewType::Grow) {
+                    0f32
+                } else {
+                    1f32
+                },
             );
             draw_border(&mut d, rec);
         }
