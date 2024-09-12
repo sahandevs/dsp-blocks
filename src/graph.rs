@@ -47,6 +47,27 @@ pub trait Block<Input>: Debug {
         let _ = context;
         control::ControlResult::Passthrough
     }
+
+    fn add_metadata(&mut self, key: &str, value: &str) {
+        let _ = key;
+        let _ = value;
+    }
+}
+
+pub trait MetadataExt {
+    fn colored<I>(self) -> Self
+    where
+        Self: Block<I>;
+}
+
+impl<T> MetadataExt for T {
+    fn colored<I>(mut self) -> Self
+    where
+        Self: Block<I>,
+    {
+        self.add_metadata("colored", "true");
+        self
+    }
 }
 
 pub trait CanStack {
@@ -646,6 +667,13 @@ where
         self.input.on_unhover(context);
         self.output.on_unhover(context);
         control::ControlResult::Passthrough
+    }
+
+    fn add_metadata(&mut self, key: &str, value: &str) {
+        match (key, value) {
+            ("colored", "true") => self.colored = true,
+            _ => {}
+        }
     }
 }
 

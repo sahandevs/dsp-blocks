@@ -3,7 +3,7 @@ use std::time::Duration;
 use synths::OscillatorControls;
 
 use crate::dsp::blocks::*;
-use crate::graph::{Block, CanConnect, CanFork, CanStack};
+use crate::graph::{Block, CanConnect, CanFork, CanStack, MetadataExt};
 use crate::{graph, vis};
 
 type Input = (
@@ -37,7 +37,8 @@ pub fn create_playground_blocks() -> anyhow::Result<(Input, impl Block<Input, Ou
         .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
         .connect(Basic::Mix)
         .fork(envelope)
-        .connect(vis::WaveView::grow());
+        .connect(vis::WaveView::grow())
+        .colored();
     let input = (
         (
             (
