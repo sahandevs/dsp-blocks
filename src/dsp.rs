@@ -15,8 +15,8 @@ pub mod signals {
         let step = duration.as_secs_f32() / num_samples as f32;
 
         let mut wave = vec![0f32; num_samples];
-        for i in 0..num_samples {
-            wave[i] = fun(step * i as f32);
+        for n in 0..num_samples {
+            wave[n] = fun(step * n as f32);
         }
         wave
     }
@@ -118,23 +118,23 @@ pub mod blocks {
 
             fn process(&mut self, controls: OscillatorControls) -> Self::Output {
                 match controls.wave {
-                    WaveType::Sinusoid => signals::create_periodic_wave(controls.duration, |x| {
-                        (2.0 * PI * controls.freq * (x as f32) + controls.phase).sin()
+                    WaveType::Sinusoid => signals::create_periodic_wave(controls.duration, |n| {
+                        (2.0 * PI * controls.freq * (n as f32) + controls.phase).sin()
                     }),
-                    WaveType::Square => signals::create_periodic_wave(controls.duration, |x| {
-                        (2.0 * PI * controls.freq * (x as f32) + controls.phase)
+                    WaveType::Square => signals::create_periodic_wave(controls.duration, |n| {
+                        (2.0 * PI * controls.freq * (n as f32) + controls.phase)
                             .sin()
                             .signum()
                     }),
-                    WaveType::Triangle => signals::create_periodic_wave(controls.duration, |x| {
+                    WaveType::Triangle => signals::create_periodic_wave(controls.duration, |n| {
                         (2.0 / PI)
-                            * (2.0 * PI * controls.freq * (x as f32) + controls.phase)
+                            * (2.0 * PI * controls.freq * (n as f32) + controls.phase)
                                 .sin()
                                 .asin()
                     }),
-                    WaveType::Sawtooth => signals::create_periodic_wave(controls.duration, |x| {
+                    WaveType::Sawtooth => signals::create_periodic_wave(controls.duration, |n| {
                         let phase_offset = controls.phase / (2.0 * PI);
-                        2.0 * (((x * controls.freq + phase_offset) % 1.0) - 0.5)
+                        2.0 * (((n * controls.freq + phase_offset) % 1.0) - 0.5)
                     }),
                 }
             }
@@ -169,21 +169,21 @@ pub mod blocks {
             let max_len = waves.iter().map(|x| x.len()).max().unwrap_or_default();
 
             let mut out: [Wave; N] = core::array::from_fn(|_| Vec::with_capacity(0));
-            for i in 0..N {
-                let wil = waves[i].len();
+            for n in 0..N {
+                let wil = waves[n].len();
                 if wil < max_len {
                     match self {
                         AutoPad::Start => {
                             let mut w = vec![0f32; max_len];
-                            w[max_len - wil..].copy_from_slice(&waves[i]);
-                            waves[i] = w;
+                            w[max_len - wil..].copy_from_slice(&waves[n]);
+                            waves[n] = w;
                         }
                         AutoPad::End => {
-                            waves[i].extend([0f32].repeat(max_len - wil));
+                            waves[n].extend([0f32].repeat(max_len - wil));
                         }
                     }
                 }
-                std::mem::swap(&mut out[i], &mut waves[i]);
+                std::mem::swap(&mut out[n], &mut waves[n]);
             }
 
             DInto::from(out)
@@ -220,30 +220,30 @@ pub mod blocks {
             match self {
                 Basic::Mix => {
                     let mut wave = vec![0f32; len];
-                    for i in 0..len {
-                        let sum: f32 = input.iter().map(|w| w[i]).sum();
-                        wave[i] = sum / N as f32;
+                    for n in 0..len {
+                        let sum: f32 = input.iter().map(|w| w[n]).sum();
+                        wave[n] = sum / N as f32;
                     }
 
                     wave
                 }
                 Basic::Amp => {
                     let mut wave = vec![0f32; len];
-                    for i in 0..len {
-                        let amp: f32 = input.iter().map(|w| w[i]).fold(1f32, |acc, x| acc * x);
-                        wave[i] = amp;
+                    for n in 0..len {
+                        let amp: f32 = input.iter().map(|w| w[n]).fold(1f32, |acc, x| acc * x);
+                        wave[n] = amp;
                     }
 
                     wave
                 }
                 Basic::Diff => {
                     let mut wave = vec![0f32; len];
-                    for i in 1..len {
-                        let acc: f32 = input.iter().map(|w| w[i]).sum();
-                        wave[i] = acc;
+                    for n in 1..len {
+                        let acc: f32 = input.iter().map(|w| w[n]).sum();
+                        wave[n] = acc;
                     }
-                    for (i, v) in input[0].iter().enumerate() {
-                        wave[i] = v - wave[i];
+                    for (n, v) in input[0].iter().enumerate() {
+                        wave[n] = v - wave[n];
                     }
 
                     wave
