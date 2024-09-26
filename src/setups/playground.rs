@@ -75,6 +75,7 @@ pub fn create_playground_blocks(
     );
 
     let sys_2 = blocks::synths::KroneckerDelta::End
+        .connect(ConstMultiplier(-1f32))
         .stack(blocks::synths::KroneckerDelta::Center)
         .stack(blocks::synths::KroneckerDelta::Start)
         .connect(blocks::Basic::Mix)

@@ -24,6 +24,12 @@ pub mod signals {
 
 pub mod blocks {
 
+    use raylib::{
+        math::Vector2,
+        prelude::{RaylibDraw, RaylibTextureModeExt},
+        texture::RaylibTexture2D,
+    };
+
     use crate::{
         graph::{Block, DInto},
         vis,
@@ -346,6 +352,60 @@ pub mod blocks {
                     self.t, self.window.frame_size, self.window.hop_length
                 ),
                 out,
+            )
+        }
+    }
+
+    #[derive(Debug, Default)]
+    pub struct ConstMultiplier(pub f32);
+
+    impl Block<Wave> for ConstMultiplier {
+        type Output = Wave;
+
+        fn process(&mut self, mut input: Wave) -> Self::Output {
+            for sample in input.iter_mut() {
+                *sample *= self.0;
+            }
+            input
+        }
+
+        fn process_and_visualize(
+            &mut self,
+            input: Wave,
+            context: &mut DrawContext,
+        ) -> (Self::Output, VisualizeResult) {
+            let out = self.process(input);
+            let mut tx = context.get_texture(vis::BOX_SIZE as _, vis::BOX_SIZE as _);
+            tx.set_texture_filter(
+                context.thread,
+                raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X,
+            );
+            let mut d = context.rl.begin_drawing(context.thread);
+            let mut d = d.begin_texture_mode(context.thread, &mut tx);
+            let pad = vis::T * 3f32;
+
+            let center = ((vis::BOX_SIZE - pad * 2f32) / 2f32) + pad;
+            d.draw_triangle_lines(
+                Vector2::new(0f32 + pad, 0f32 + pad),
+                Vector2::new(0f32 + pad, vis::BOX_SIZE - pad),
+                Vector2::new(vis::BOX_SIZE - pad, center),
+                vis::BORDER_COLOR,
+            );
+            d.draw_text(
+                &format!("* {}", self.0),
+                center as _,
+                (pad as i32) / 2,
+                1,
+                vis::TEXT_COLOR,
+            );
+            drop(d);
+            (
+                out,
+                VisualizeResult::Block {
+                    texture: tx,
+                    input_connections: vec![Vector2::new(0f32 + pad, center)],
+                    output_connections: vec![Vector2::new(vis::BOX_SIZE - pad, center)],
+                },
             )
         }
     }
