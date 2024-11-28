@@ -351,6 +351,9 @@ impl<I: DInto<[Wave; N]>, const N: usize> Block<I> for WaveView<N> {
 
         let unit = (if self.is_hovering { 10f32 } else { 2f32 }) * BOX_SIZE;
 
+        let stat_font_size: f32 = 13f32;
+        let stats_height: f32 = N as f32 * stat_font_size;
+
         let rec = match self.t {
             WaveViewType::Grow => {
                 // unit per SR
@@ -374,7 +377,7 @@ impl<I: DInto<[Wave; N]>, const N: usize> Block<I> for WaveView<N> {
             }
         };
 
-        let mut tx = context.get_texture(rec.width as _, rec.height as _);
+        let mut tx = context.get_texture(rec.width as _, rec.height as u32 + stats_height as u32);
         tx.set_texture_filter(
             context.thread,
             raylib::ffi::TextureFilter::TEXTURE_FILTER_ANISOTROPIC_16X,
@@ -396,6 +399,7 @@ impl<I: DInto<[Wave; N]>, const N: usize> Block<I> for WaveView<N> {
                 x: 5f32,
                 y: 0f32,
             };
+            // FIXME: draw_wave scales the y values based on y resulting all waveforms being normalized.
             draw_wave(
                 &mut d,
                 inner_box,
@@ -407,7 +411,24 @@ impl<I: DInto<[Wave; N]>, const N: usize> Block<I> for WaveView<N> {
                     1f32
                 },
             );
-            draw_border(&mut d, rec);
+        }
+        draw_border(&mut d, rec);
+
+        for i in 0..N {
+            let mean = out[i].iter().fold(0f32, |acc, x| acc + x) / out[i].len() as f32;
+            let std = (out[i]
+                .iter()
+                .map(|x| (*x - mean).powi(2))
+                .fold(0f32, |acc, x| acc + x)
+                / out[i].len() as f32)
+                .sqrt();
+            d.draw_text(
+                format!("u={mean:.3}, s={std:.3}").as_str(),
+                rec.x as _,
+                (rec.height + (stat_font_size * i as f32)) as _,
+                stat_font_size as _,
+                LINE_COLORS[i],
+            );
         }
 
         drop(d);
