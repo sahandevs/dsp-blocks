@@ -12,6 +12,7 @@ pub mod dsp;
 pub mod graph;
 pub mod setups;
 pub mod vis;
+pub mod wav;
 
 const W: i32 = 1080;
 const H: i32 = 720;

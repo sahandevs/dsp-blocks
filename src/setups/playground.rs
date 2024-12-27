@@ -5,6 +5,7 @@ use synths::OscillatorControls;
 use crate::dsp::blocks::*;
 use crate::graph::{Block, CanConnect, CanFork, CanStack, MetadataExt};
 use crate::vis::{Identity, WaveView};
+use crate::wav::WavWriter;
 use crate::{graph, vis};
 
 type Input1 = (
@@ -39,7 +40,7 @@ pub fn create_playground_blocks(
         .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
         .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
         .stack(blocks::synths::Oscillator.connect(vis::WaveView::small()))
-        .connect(Basic::Mix)
+        .connect(Basic::Mix.connect(WavWriter::new("./target/out.wav")?).connect(vis::AudioSink::try_default()?))
         .fork(envelope)
         .connect(vis::WaveView::grow())
         .colored();
