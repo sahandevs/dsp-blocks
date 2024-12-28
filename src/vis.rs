@@ -1,11 +1,10 @@
 use std::fmt::Debug;
+use std::sync::{Arc, Mutex};
 
 use crate::dsp;
 use crate::dsp::Wave;
 use crate::graph::{Block, DInto};
 use raylib::prelude::*;
-use rodio::Source;
-use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 pub const BOX_SIZE: f32 = 55f32;
 pub const BORDER_COLOR: Color = Color::WHITE;
@@ -258,9 +257,8 @@ pub fn visualize_simple_box<O>(
 }
 
 pub struct AudioSink {
-    stream: OutputStream,
-    stream_handle: OutputStreamHandle,
-    sink: Sink,
+    buffer: Arc<Mutex<Wave>>,
+    // client: jack::AsyncClient<(), jack::contrib::ClosureProcessHandler<(), F>>,
 }
 
 impl Debug for AudioSink {
@@ -271,14 +269,80 @@ impl Debug for AudioSink {
 
 impl AudioSink {
     pub fn try_default() -> anyhow::Result<Self> {
-        let (stream, stream_handle) = OutputStream::try_default()?;
-        let sink = Sink::try_new(&stream_handle)?;
+        let (client, _status) =
+            jack::Client::new("dsp-block_audio-sink", jack::ClientOptions::default())?;
 
-        Ok(Self {
-            stream,
-            stream_handle,
-            sink,
-        })
+        assert_eq!(
+            client.sample_rate(),
+            dsp::SR,
+            "dsp-blocks only work on sample rate {} but got {} from jack",
+            dsp::SR,
+            client.sample_rate()
+        );
+
+        struct State {
+            buffer: Arc<Mutex<Wave>>,
+            cursor: usize,
+            port: jack::Port<jack::AudioOut>,
+        }
+        let out = client.register_port("output", jack::AudioOut::default())?;
+
+        let mut state = State {
+            buffer: Arc::new(Default::default()),
+            cursor: 0,
+            port: out,
+        };
+        let buffer = state.buffer.clone();
+
+        let process_callback = move |_: &jack::Client, ps: &jack::ProcessScope| -> jack::Control {
+            let g = {
+                let this = state.buffer.lock();
+                match this {
+                    Ok(t) => t,
+                    Err(e) => std::process::exit(1),
+                }
+            };
+            let client_buffer = g.as_slice();
+
+            let port_buffer = state.port.as_mut_slice(ps);
+
+            let select = &client_buffer
+                [state.cursor..(state.cursor + port_buffer.len()).min(client_buffer.len())];
+            
+            if select.len() == 0 {
+                return jack::Control::Continue;
+            }
+            println!("xxx");
+            if select.len() == port_buffer.len() {
+                println!("{}", select[50]);
+                port_buffer.copy_from_slice(select);
+
+            }
+            
+            let remaining =
+            port_buffer.len() as isize - (client_buffer.len() - state.cursor) as isize;
+            println!("xxx {}", remaining);
+
+            if remaining <= 0 {
+                state.cursor += port_buffer.len();
+            } else {
+                state.cursor = 0;
+                let remaining_out_buffer = &mut port_buffer[remaining as usize..];
+                remaining_out_buffer.copy_from_slice(
+                    &client_buffer[state.cursor
+                        ..(state.cursor + remaining_out_buffer.len()).min(client_buffer.len())],
+                );
+                state.cursor += remaining as usize;
+            }
+
+            jack::Control::Continue
+        };
+        let process = jack::contrib::ClosureProcessHandler::new(Box::new(process_callback));
+
+        let x = client.activate_async((), process)?;
+        // FIXME: handle cleanup
+        std::mem::forget(x);
+        Ok(AudioSink { buffer })
     }
 }
 
@@ -286,15 +350,12 @@ impl Block<Wave> for AudioSink {
     type Output = Wave;
 
     fn process(&mut self, input: Wave) -> Self::Output {
-        let source =
-            rodio::buffer::SamplesBuffer::new(1, dsp::SR as u32, input.clone()).repeat_infinite();
-
+        self.buffer
+            .lock()
+            .unwrap()
+            .extend_from_slice(input.as_slice());
         // let total_duration = input.len() as f32 / dsp::SR as f32;
         // let current_sound_pos = (sink.get_pos().as_secs_f32() / total_duration) % total_duration;
-
-        self.sink.append(source);
-        self.sink.set_volume(0.02);
-        self.sink.play();
 
         input
     }

@@ -2,7 +2,7 @@ use crate::vis::{DrawContext, VisualizeResult};
 
 use std::f32::consts::PI;
 use std::fmt::Debug;
-pub const SR: usize = 44100;
+pub const SR: usize = 48000;
 
 pub type Wave = Vec<f32>;
 
